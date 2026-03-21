@@ -232,3 +232,11 @@ lightcron/
 | `LIGHTCRON_UI_ORIGIN` | — | Allowed CORS origin for the web UI (e.g. `http://localhost:5173`) |
 | `WORKER_CONCURRENCY` | `2` | Max concurrent jobs per worker node |
 | `VITE_API_BASE_URL` | — | Scheduler API base URL for the frontend (build-time) |
+
+## Acknowledgements
+
+This project was built using the Claude Agent Framework created by Neal Naidoo.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
