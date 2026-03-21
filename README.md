@@ -33,6 +33,10 @@ The scheduler runs two background loops:
 - **Ready-transition loop** (every 10 s) — marks `pending` jobs `ready` when `start_time` is reached and all dependencies are `completed`
 - **Health-check loop** (every 30 s) — detects stale workers and marks their jobs `lost`
 
+## Documentation
+
+- [Web UI Guide](docs/web-ui.md) — screenshots and field reference for the dashboard and job scheduling form
+
 ## Prerequisites
 
 | Tool | Version |
