@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+
+  # ── Lint ─────────────────────────────────────────────────────────────────────
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check src/ tests/
+      - name: Frontend lint
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run lint
+
+  # ── Type check ───────────────────────────────────────────────────────────────
+
+  type-check:
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: mypy
+      - name: Frontend type check
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run type-check
+
+  # ── Backend tests ─────────────────────────────────────────────────────────────
+
+  test-backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: lightcron
+          POSTGRES_USER: lightcron
+          POSTGRES_PASSWORD: lightcron
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U lightcron"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron
+      PGBOUNCER_URL: postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+
+      # ops condition C2: alembic check before upgrade
+      - name: Check for pending migrations
+        run: alembic check
+      - name: Apply migrations
+        run: alembic upgrade head
+
+      # ops condition C3: FK integrity validation
+      - name: FK integrity check
+        run: psql "${{ env.DATABASE_URL }}" -f scripts/check_fk_integrity.sql
+
+      - name: Run tests
+        run: pytest --cov=src/lightcron --cov-report=xml --cov-fail-under=80
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  # ── E2E tests ─────────────────────────────────────────────────────────────────
+
+  test-e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Start Docker Compose stack
+        run: docker compose --profile ui up -d --wait
+        timeout-minutes: 5
+
+      - name: Install Playwright
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        working-directory: frontend
+        run: npx playwright test
+        env:
+          PLAYWRIGHT_BASE_URL: http://localhost:5173
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+
+  # ── Security ──────────────────────────────────────────────────────────────────
+
+  security:
+    name: Security scanning
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ops condition C1: gitleaks secret detection
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install bandit pip-audit
+
+      - name: Bandit SAST
+        run: bandit -r src/lightcron -ll
+
+      - name: pip-audit dependency scan
+        run: pip-audit --requirement <(pip freeze)

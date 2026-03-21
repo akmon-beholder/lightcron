@@ -1,0 +1,34 @@
+{
+  "name": "lightcron-ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit",
+    "test": "playwright test"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "@tanstack/react-query": "^5.56.2",
+    "axios": "^1.7.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "@playwright/test": "^1.47.2",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.8",
+    "eslint": "^9.11.1",
+    "@eslint/js": "^9.11.1",
+    "typescript-eslint": "^8.7.0",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.12"
+  }
+}

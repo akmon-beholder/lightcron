@@ -16,7 +16,12 @@
       "Bash(for f:*)",
       "Bash(do)",
       "Bash(sed -i -e 's/RunnerAgent/WorkerAgent/g' -e 's/runner_agent/worker_agent/g' -e 's/runner agent/worker agent/g' -e 's/Runner Agent/Worker Agent/g' -e 's/Runner agent/Worker agent/g' \"$f\")",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(uv run:*)",
+      "Bash(do echo:*)",
+      "Read(//home/akmon/dev/beholder/lightcron/**)",
+      "Bash(grep -v \"^$\")",
+      "Bash(python:*)"
     ]
   }
 }
