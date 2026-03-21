@@ -1,10 +1,11 @@
 # Shared Conventions — Lightcron
 
-**Version**: v3
+**Version**: v5
 **Created**: 2026-03-21
 **Updated**: 2026-03-21 — v2: corrected cancel from DELETE to POST; workers use DB-direct, not REST
 **Updated**: 2026-03-21 — v3: two-stage worker liveness detection (60s → /health probe, 90s → offline)
 **Updated**: 2026-03-21 — v4: pull-based job claiming; added `ready` status; scheduler no longer assigns workers
+**Updated**: 2026-03-21 — v5: added web UI (J009, J010); web_ui_user persona; frontend conventions
 **Agent**: design (Phase A)
 **Purpose**: Single source of truth for naming, roles, thresholds, and patterns.
              Every BDD generation agent receives this document verbatim.
@@ -46,9 +47,9 @@ by reading and writing to the shared database.
 
 | Role                | Description                                                         |
 |---------------------|---------------------------------------------------------------------|
-| `job_submitter`     | Application developer calling the scheduler REST API to schedule/query/cancel jobs |
-| `platform_operator` | Engineer managing the Lightcron deployment and worker fleet         |
-| `sre_operator`      | On-call engineer responding to incidents and managing running jobs  |
+| `job_submitter`     | Application developer calling the scheduler REST API (or web UI) to schedule/query/cancel jobs |
+| `platform_operator` | Engineer managing the Lightcron deployment and worker fleet; primary web UI user |
+| `sre_operator`      | On-call engineer responding to incidents; uses web UI dashboard for at-a-glance status |
 | `worker_agent`      | The process running on each worker node; reads/writes DB via pgBouncer; exposes `/health` |
 | `scheduler`         | The Lightcron central service; owns the REST API and background dispatch/health-check loops |
 
@@ -105,7 +106,7 @@ by reading and writing to the shared database.
 | `completed` | Worker Agent   | worker_agent stopped the job at end_time; process exited |
 | `cancelled` | Scheduler      | Cancelled via REST API; worker_agent detects on next poll and stops if running |
 | `failed`    | Worker Agent   | Execution error; worker_agent wrote failure with exit_code |
-| `timed_out` | Scheduler      | worker_status.last_seen expired; scheduler wrote timed_out |
+| `lost`      | Scheduler      | worker_status.last_seen expired; scheduler wrote `lost` — worker considered unreachable |
 
 ### Status Transition Flow
 
@@ -116,7 +117,7 @@ assigned ──(worker_agent starts process)────▶  running
 running  ──(end_time reached / exit 0)──────▶  completed
 running  ──(exit code != 0)─────────────────▶  failed
 pending/ready/assigned/running ─(API cancel)▶  cancelled
-assigned/running ──(heartbeat timeout)──────▶  timed_out
+assigned/running ──(heartbeat timeout)──────▶  lost
 ```
 
 ---
@@ -147,7 +148,7 @@ last_seen < 60s  →  worker considered healthy, no action
 last_seen >= 60s →  Stage 1: scheduler calls GET /health on worker's REST API
                        /health returns 200  →  worker is alive; no status change
                        /health fails/timeout →  Stage 2: mark worker_status offline,
-                                                mark all assigned/running jobs timed_out
+                                                mark all assigned/running jobs lost
 last_seen >= 90s →  Skip /health probe (assume dead); go directly to Stage 2
 ```
 
@@ -230,7 +231,7 @@ Scheduler ready-transition loop (poll interval TBD):
 Scheduler health-check loop (every 30s):
   -- Two-stage liveness: see Numeric Constants for thresholds
   -- Stage 1 (last_seen >= 60s): call GET /health on worker_agent
-  -- Stage 2 (last_seen >= 90s OR /health failed): mark worker offline, jobs timed_out
+  -- Stage 2 (last_seen >= 90s OR /health failed): mark worker offline, jobs lost
 ```
 
 ---
@@ -255,6 +256,37 @@ Background:
 
 ---
 
+---
+
+## Web UI Pages (EXACT — React Router routes)
+
+The web UI is a React/TypeScript SPA that communicates exclusively with the scheduler REST API.
+
+| Route        | Page Component     | Purpose                                      |
+|--------------|--------------------|----------------------------------------------|
+| `/`          | `DashboardPage`    | Worker fleet panel + jobs panel (J009)       |
+| `/jobs/new`  | `ScheduleJobPage`  | Job submission form (J010)                   |
+
+**Key rule**: The web UI ONLY calls the scheduler REST API paths listed in the Scheduler REST API Paths table above. It does not call worker REST APIs directly.
+
+---
+
+## Frontend Architecture (EXACT — Feature-Sliced Design layers)
+
+| Layer      | Purpose                                         | Examples                            |
+|------------|-------------------------------------------------|-------------------------------------|
+| `app/`     | Entry point, router, global providers           | React Query provider, Router        |
+| `pages/`   | Route-level components; compose widgets         | DashboardPage, ScheduleJobPage      |
+| `widgets/` | Standalone UI blocks composed from features/entities | WorkerFleetPanel, JobsPanel    |
+| `features/`| User-facing interactive behaviours              | ScheduleJobForm, StatusFilter       |
+| `entities/`| Business objects + their UI representations     | Job model + JobStatusBadge          |
+| `shared/`  | Reusable infrastructure; no business logic      | API client, useJobs, useWorkers     |
+
+**Import rule** (FSD): lower layers may NOT import from higher layers.
+`shared` ← `entities` ← `features` ← `widgets` ← `pages` ← `app`
+
+---
+
 ## Anti-Patterns
 
 - Do NOT use DELETE for job cancellation — use POST /jobs/{job_id}/cancel
@@ -265,3 +297,5 @@ Background:
 - Do NOT round numeric constants (last_seen timeout is 90s, not "about a minute")
 - Do NOT assume authentication details — mark auth steps as `# TODO: auth scheme TBD`
 - If the spec is ambiguous, mark with `# SPEC-AMBIGUOUS: {what's unclear}`
+- Do NOT have the web UI call worker REST APIs directly — it must go via the scheduler API
+- Do NOT hardcode the scheduler API base URL in frontend code — use an environment variable

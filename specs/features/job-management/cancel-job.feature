@@ -45,8 +45,8 @@ Feature: Cancel a Job
     Then the response status is 409
 
   @error-handling
-  Scenario: Cannot cancel a timed_out job
-    Given a job "j-007" has status "timed_out"
+  Scenario: Cannot cancel a lost job
+    Given a job "j-007" has status "lost"
     When POST /jobs/j-007/cancel is called
     Then the response status is 409
 

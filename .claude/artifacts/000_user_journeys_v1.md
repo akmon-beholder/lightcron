@@ -1,7 +1,8 @@
 # User Journeys — Lightcron
 
-**Version**: 1.0
+**Version**: 1.1
 **Created**: 2026-03-21
+**Updated**: 2026-03-21 — v1.1: added J009 (System Dashboard) and J010 (Schedule Job via UI)
 **Agent**: design (Phase A)
 
 ---
@@ -24,6 +25,7 @@
 | Platform Operator   | Worker fleet management, job dispatch, no-downtime scaling | P1 |
 | SRE / On-Call       | Fast incident diagnosis, cancel/force-stop without DB access | P1 |
 | System Admin        | API auth, worker identity, audit trail, retention        | P2 |
+| Web UI User         | At-a-glance system health; submit jobs without constructing raw HTTP requests | P2 |
 
 ---
 
@@ -52,7 +54,8 @@ As a job_submitter, I want to schedule a job with a start time and end time via 
 - **AC-J001-04**: Given a valid payload with a depends_on list of existing job_ids, When POST /jobs is called, Then HTTP 201 is returned and the job stores the dependency list
 - **AC-J001-05**: Given a depends_on list containing a job_id that does not exist, When POST /jobs is called, Then HTTP 422 is returned identifying the unknown dependency
 - **AC-J001-06**: Given a valid payload with max_runtime set to a positive integer (seconds), When POST /jobs is called, Then HTTP 201 is returned and max_runtime is stored against the job
-- **AC-J001-07**: Given a valid payload with no max_runtime or max_memory, When POST /jobs is called, Then the job is created with both limits set to unlimited
+- **AC-J001-07**: Given a valid payload with max_memory set to a positive integer (MB), When POST /jobs is called, Then HTTP 201 is returned and max_memory is stored against the job
+- **AC-J001-08**: Given a valid payload with no max_runtime or max_memory, When POST /jobs is called, Then the job is created with both limits set to unlimited
 
 ### BDD Feature File
 
@@ -66,6 +69,7 @@ As a job_submitter, I want to schedule a job with a start time and end time via 
 | Missing field          | command or start_time absent       | HTTP 422, field identified      |
 | Unknown dependency     | depends_on contains unknown job_id | HTTP 422, unknown id identified |
 | Invalid max_runtime    | max_runtime <= 0                   | HTTP 422, validation error      |
+| Invalid max_memory     | max_memory <= 0                    | HTTP 422, validation error      |
 | Malformed JSON         | Unparseable request body           | HTTP 400                        |
 
 ---
@@ -104,7 +108,7 @@ As a worker_agent on a worker node, I want to register with the scheduler so tha
 |-----------------------|--------------------------------------|--------------------------------------------|
 | last_seen timeout     | No DB update for 90s                 | Scheduler marks worker_status `offline`    |
 | Stale last_seen + healthy | last_seen ≥60s; GET /health → 200 | Worker remains `online`               |
-| Stale last_seen + dead    | last_seen ≥60s; GET /health fails | Worker marked `offline`; jobs `timed_out` |
+| Stale last_seen + dead    | last_seen ≥60s; GET /health fails | Worker marked `offline`; jobs `lost` |
 | Duplicate registration | Same hostname re-registers          | Existing worker_id preserved; status reset to `online` |
 
 ---
@@ -147,7 +151,7 @@ As the scheduler and worker_agent, I want the scheduler to mark a job `ready` wh
 | Dependency not yet completed       | depends_on job still `running`            | Job stays `pending`; re-evaluated each scheduler loop |
 | All workers offline                | No `online` workers polling               | Job stays `ready` until a worker comes online and polls |
 | Claim race condition               | Two workers claim simultaneously          | Exactly one wins; other retries with next `ready` job |
-| Worker crashes after claim, before start | Heartbeat expires while `assigned`   | Scheduler marks job `timed_out` after 90s        |
+| Worker crashes after claim, before start | Heartbeat expires while `assigned`   | Scheduler marks job `lost` after 90s        |
 
 ---
 
@@ -174,7 +178,10 @@ As the worker_agent, I want to let a job process run until it exits naturally an
 - **AC-J004-02**: Given a `running` job whose process exits with a non-zero code, Then the worker_agent writes status `failed` and the exit_code to the jobs table
 - **AC-J004-03**: Given a job with max_runtime set and the process has been running for that duration, Then the worker_agent sends SIGTERM to the process
 - **AC-J004-04**: Given a SIGTERM was sent and the process does not exit within the grace period, Then the worker_agent sends SIGKILL; the job is marked `failed` with a kill_reason of `max_runtime_exceeded`
-- **AC-J004-05**: Given a job with no max_runtime set, Then the worker_agent lets the process run until it exits naturally with no timeout
+- **AC-J004-05**: Given a job with no max_runtime set, Then the worker_agent lets the process run until it exits naturally with no runtime timeout
+- **AC-J004-07**: Given a job with max_memory set and the process exceeds that limit, Then the worker_agent sends SIGTERM to the process
+- **AC-J004-08**: Given a SIGTERM was sent for a memory violation and the process does not exit within the grace period, Then the worker_agent sends SIGKILL; the job is marked `failed` with a kill_reason of `max_memory_exceeded`
+- **AC-J004-09**: Given a job with no max_memory set, Then the worker_agent places no memory limit on the process
 - **AC-J004-06**: Given a completed or failed job, When GET /jobs/{job_id} is called, Then the response includes exit_code, started_at, finished_at, and worker_id
 
 ### BDD Feature File
@@ -187,7 +194,8 @@ As the worker_agent, I want to let a job process run until it exits naturally an
 |----------------------------|--------------------------------------|-------------------------------------------------|
 | Non-zero exit code         | Process exits with code != 0         | Status → `failed`, exit_code recorded           |
 | max_runtime exceeded       | Process runs longer than max_runtime | SIGTERM → grace → SIGKILL; status → `failed`, kill_reason `max_runtime_exceeded` |
-| Worker agent crashes mid-job | Heartbeat expires while `running`  | Scheduler marks job `timed_out`                 |
+| max_memory exceeded        | Process exceeds max_memory           | SIGTERM → grace → SIGKILL; status → `failed`, kill_reason `max_memory_exceeded`  |
+| Worker agent crashes mid-job | Heartbeat expires while `running`  | Scheduler marks job `lost`                 |
 
 ---
 
@@ -212,7 +220,7 @@ As an sre_operator or job_submitter, I want to cancel a job via the API regardle
 
 - **AC-J005-01**: Given a `pending` job, When POST /jobs/{job_id}/cancel is called, Then HTTP 200 is returned and status is `cancelled`
 - **AC-J005-02**: Given a `running` job, When POST /jobs/{job_id}/cancel is called, Then HTTP 200 is returned, the scheduler writes `cancelled` to the jobs table, and the worker_agent stops the process on its next poll
-- **AC-J005-03**: Given a `completed`, `failed`, or `timed_out` job, When POST /jobs/{job_id}/cancel is called, Then HTTP 409 is returned (terminal state, cannot cancel)
+- **AC-J005-03**: Given a `completed`, `failed`, or `lost` job, When POST /jobs/{job_id}/cancel is called, Then HTTP 409 is returned (terminal state, cannot cancel)
 - **AC-J005-04**: Given a job_id that does not exist, When POST /jobs/{job_id}/cancel is called, Then HTTP 404 is returned
 
 ### BDD Feature File
@@ -305,22 +313,23 @@ As a platform_operator, I want to query all registered workers and their current
 
 ### User Story
 
-As the scheduler, I want to detect when a worker has stopped sending heartbeats and automatically mark its jobs as `timed_out` so that stuck jobs do not remain in `running` or `assigned` state indefinitely.
+As the scheduler, I want to detect when a worker has stopped sending heartbeats and automatically mark its jobs as `lost` so that stuck jobs do not remain in `running` or `assigned` state indefinitely.
 
 ### Flow Steps
 
 | Step | User Action                                      | System Response                                                       | Success Criteria                          |
 |------|--------------------------------------------------|-----------------------------------------------------------------------|-------------------------------------------|
 | 1    | Worker stops sending heartbeats                  | Scheduler records no heartbeat received                               | last_seen timestamp stops updating        |
-| 2    | (90s elapse since last heartbeat)                | Scheduler marks worker as `offline`; marks all its `running` and `assigned` jobs as `timed_out` | Worker is `offline`; jobs are `timed_out` |
-| 3    | Operator calls GET /jobs?status=timed_out        | Returns list of affected jobs                                         | All stuck jobs visible for remediation    |
+| 2    | (90s elapse since last heartbeat)                | Scheduler marks worker as `offline`; marks all its `running` and `assigned` jobs as `lost` | Worker is `offline`; jobs are `lost` |
+| 3    | Operator calls GET /jobs?status=lost        | Returns list of affected jobs                                         | All stuck jobs visible for remediation    |
 
 ### Acceptance Criteria
 
-- **AC-J008-01**: Given a worker with a `running` job that has not sent a heartbeat for 90s, Then the scheduler marks the worker as `offline` and the job as `timed_out`
-- **AC-J008-02**: Given a worker with an `assigned` job (not yet confirmed running) that has not sent a heartbeat for 90s, Then the job is marked `timed_out`
-- **AC-J008-03**: Given a worker that re-registers after going `offline`, Then it is treated as a new registration with a new worker_id
-- **AC-J008-04**: Given a `timed_out` job, When queried via GET /jobs/{job_id}, Then status is `timed_out` with the worker_id that was assigned
+- **AC-J008-01**: Given a worker with a `running` job that has not sent a heartbeat for 90s, Then the scheduler marks the worker as `offline` and the job as `lost`
+- **AC-J008-02**: Given a worker with an `assigned` job (not yet confirmed running) that has not sent a heartbeat for 90s, Then the job is marked `lost`
+- **AC-J008-03**: Given a worker that re-registers after going `offline`, Then it receives the same worker_id as before (matched by hostname) and its status is reset to `online`
+- **AC-J008-04**: Given a `lost` job, When queried via GET /jobs/{job_id}, Then status is `lost` with the worker_id that was assigned
+- **AC-J008-05**: Given a worker_agent reconnects and finds a job it was running has status `lost` in the jobs table, Then the worker_agent kills the process and does not update the job status (the scheduler's `lost` write is authoritative)
 
 ### BDD Feature File
 
@@ -331,7 +340,91 @@ As the scheduler, I want to detect when a worker has stopped sending heartbeats 
 | Scenario                   | Trigger                              | Expected Behaviour                         |
 |----------------------------|--------------------------------------|--------------------------------------------|
 | Transient network blip     | Worker misses 1-2 heartbeats but recovers | Job remains `running` (threshold is 90s) |
-| Multiple workers go offline | Mass worker failure                  | All affected jobs marked `timed_out`       |
+| Multiple workers go offline | Mass worker failure                  | All affected jobs marked `lost`       |
+
+---
+
+## Journey: J009 — View System State via Web UI Dashboard
+
+**Priority**: P2
+**Lens**: Platform Operator / SRE
+
+### User Story
+
+As a platform_operator or sre_operator, I want a web dashboard that shows the current state of the worker fleet and recent jobs so that I can assess system health without constructing REST API requests.
+
+### Flow Steps
+
+| Step | User Action                                      | System Response                                  | Success Criteria                        |
+|------|--------------------------------------------------|--------------------------------------------------|-----------------------------------------|
+| 1    | Navigate to the dashboard URL                    | UI fetches GET /workers and GET /jobs from the scheduler REST API | Dashboard renders worker fleet panel and jobs panel |
+| 2    | Apply a status filter to the jobs panel          | UI fetches GET /jobs?status={filter}             | Jobs panel updates to show only matching jobs |
+| 3    | (auto-refresh interval elapses)                  | UI re-fetches both endpoints                     | Panels reflect latest state without a page reload |
+
+### Acceptance Criteria
+
+- **AC-J009-01**: Given registered workers, When the dashboard is loaded, Then the worker fleet panel shows each worker's worker_id, hostname, status, last_seen, and count of running jobs
+- **AC-J009-02**: Given an offline worker, When the dashboard is loaded, Then that worker appears in the fleet panel with status `offline`
+- **AC-J009-03**: Given jobs in the jobs table, When the dashboard is loaded, Then the jobs panel shows each job's job_id, command (truncated if long), status, and worker_id (if assigned)
+- **AC-J009-04**: Given the jobs panel is displaying jobs, When the user selects a status filter, Then only jobs with that status are shown
+- **AC-J009-05**: Given the dashboard is open, When the auto-refresh interval elapses, Then the UI re-fetches worker and job data and updates both panels without a full page reload
+- **AC-J009-06**: Given no workers are registered, When the dashboard is loaded, Then the worker fleet panel shows a "no workers registered" empty state
+- **AC-J009-07**: Given no jobs exist, When the dashboard is loaded, Then the jobs panel shows a "no jobs" empty state
+
+### BDD Feature File
+
+**File**: `specs/features/ui/system-dashboard.feature`
+
+### Error Scenarios
+
+| Scenario              | Trigger                         | Expected Behaviour                               |
+|-----------------------|---------------------------------|--------------------------------------------------|
+| No workers            | Empty worker_status table       | Empty state message in worker fleet panel        |
+| No jobs               | Empty jobs table                | Empty state message in jobs panel                |
+| Offline worker        | Worker last_seen > 90s          | Worker shown as `offline` in fleet panel         |
+
+---
+
+## Journey: J010 — Schedule a Job via Web UI Form
+
+**Priority**: P2
+**Lens**: Platform Operator / Job Submitter
+
+### User Story
+
+As a platform_operator or job_submitter, I want to schedule a new job by filling in a form in the web UI so that I can submit jobs without constructing raw HTTP requests.
+
+### Flow Steps
+
+| Step | User Action                                      | System Response                                  | Success Criteria                        |
+|------|--------------------------------------------------|--------------------------------------------------|-----------------------------------------|
+| 1    | Navigate to the "Schedule Job" page              | Form renders with fields: command, start_time, max_runtime (optional), max_memory (optional), depends_on (optional) | Form is usable |
+| 2    | Fill in the form and submit                      | UI POSTs to /jobs with the form data             | HTTP 201; job_id displayed; link to job detail shown |
+| 3    | Submit with invalid data                         | UI shows inline validation errors (client-side or from API 422 response) | User can correct and resubmit |
+
+### Acceptance Criteria
+
+- **AC-J010-01**: Given valid command and start_time, When the user submits the form, Then a job is created (HTTP 201) and the job_id is displayed to the user
+- **AC-J010-02**: Given the user leaves command empty, When the user submits, Then an inline validation error is shown on the command field and the form is not submitted to the API
+- **AC-J010-03**: Given the user enters a start_time in the past, When the user submits, Then an inline validation error is shown on the start_time field
+- **AC-J010-04**: Given the user enters a non-positive max_runtime, When the user submits, Then an inline validation error is shown on the max_runtime field
+- **AC-J010-05**: Given the user enters a non-positive max_memory, When the user submits, Then an inline validation error is shown on the max_memory field
+- **AC-J010-06**: Given valid form data including all optional fields (max_runtime, max_memory, depends_on), When the user submits, Then the job is created with all fields stored
+- **AC-J010-07**: Given the server returns a 422 error for an unknown depends_on job_id, When the response is received, Then the UI displays the server error message inline
+
+### BDD Feature File
+
+**File**: `specs/features/ui/schedule-job-ui.feature`
+
+### Error Scenarios
+
+| Scenario                  | Trigger                            | Expected Behaviour                              |
+|---------------------------|------------------------------------|-------------------------------------------------|
+| Missing command           | command field empty                | Inline validation error; no API call made       |
+| Past start_time           | start_time < now                   | Inline validation error; no API call made       |
+| Invalid max_runtime       | max_runtime ≤ 0                    | Inline validation error; no API call made       |
+| Invalid max_memory        | max_memory ≤ 0                     | Inline validation error; no API call made       |
+| Unknown depends_on        | Server returns 422                 | Server error displayed inline                   |
 
 ---
 
@@ -347,8 +440,10 @@ J001 (Schedule Job)
   └── J003 (Job Dispatch) — job must exist to be dispatched
   └── J005 (Cancel Job) — job must exist to be cancelled
   └── J006 (Query Status) — job must exist to query
+  └── J010 (Schedule Job via UI) — UI wraps J001 REST call
 
 J007 (Worker Fleet Status) — requires J002
+  └── J009 (System Dashboard) — UI wraps J006 + J007 REST calls
 ```
 
 ---
@@ -365,15 +460,17 @@ J007 (Worker Fleet Status) — requires J002
 | J006    | specs/features/job-management/query-job-status.feature | Yes       | No (API-only)  |
 | J007    | specs/features/operations/worker-health-monitoring.feature | Yes   | No (API-only)  |
 | J008    | specs/features/operations/stuck-job-recovery.feature  | Yes        | No (API-only)  |
+| J009    | specs/features/ui/system-dashboard.feature            | No         | Yes            |
+| J010    | specs/features/ui/schedule-job-ui.feature             | No         | Yes            |
 
 ---
 
 ## Handoff to Phase B
 
 **Summary for Solution Design**:
-- Total Journeys: 8
+- Total Journeys: 10
 - P1 (Critical): J001, J002, J003, J004, J005, J006, J008
-- P2 (Important): J007
+- P2 (Important): J007, J009, J010
 - Key Technical Implications:
   - Scheduler has two background loops: ready-transition (pending→ready) and health-check (worker liveness)
   - Worker agents pull and claim jobs from the DB — no push/assignment from the scheduler
@@ -382,4 +479,5 @@ J007 (Worker Fleet Status) — requires J002
   - Accepted trade-off: pull-based adds latency (poll interval) vs. push-based; acceptable for v1
   - Job process lifecycle (SIGTERM → grace → SIGKILL) owned by the worker_agent
   - All state lives in the database — ACID guarantees are critical for status transitions
-- Suggested Implementation Order: J002 → J001 → J003 → J004 → J008 → J005 → J006 → J007
+  - Web UI (J009, J010) is a React/TypeScript SPA; communicates with the scheduler REST API only; tested with Playwright
+- Suggested Implementation Order: J002 → J001 → J003 → J004 → J008 → J005 → J006 → J007 → J009 → J010

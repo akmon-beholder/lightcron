@@ -81,9 +81,9 @@ Feature: Job Ready Transition and Pull-Based Worker Claiming
   # ── Stuck job after claim ──────────────────────────────────────────────────────
 
   @error-handling
-  Scenario: Assigned job transitions to timed_out if worker heartbeat expires before confirming start
+  Scenario: Assigned job transitions to lost if worker heartbeat expires before confirming start
     Given a job "j-003" has status "assigned" with worker_id "w-003"
     And worker_status for "w-003" has last_seen 90 seconds ago
     When the scheduler runs its health check
-    Then job "j-003" status in the jobs table is "timed_out"
+    Then job "j-003" status in the jobs table is "lost"
     And worker_status for "w-003" has status "offline"
