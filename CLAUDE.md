@@ -24,53 +24,23 @@ Key design constraints that must be preserved:
 
 ## Running Tests
 
-Tests require a live PostgreSQL instance. Always start the database first:
-
-```bash
-docker compose up db -d
-uv run alembic upgrade head
-```
-
-Run the full BDD suite:
-
-```bash
-uv run python -m pytest tests/bdd/ -v
-```
-
-Run with coverage (must reach 80%):
-
-```bash
-uv run python -m pytest tests/bdd/ --cov=src/lightcron --cov-report=term-missing --cov-fail-under=80
-```
-
-Run a single scenario file:
-
-```bash
-uv run python -m pytest tests/bdd/steps/job_management/test_schedule_job.py -v
-```
-
-Run just smoke tests:
-
-```bash
-uv run python -m pytest tests/bdd/ -m smoke -v
-```
-
-The pgBouncer integration test also requires `pgbouncer` service running (`docker compose up pgbouncer -d`).
+See **README.md** for all test commands (BDD, integration, Playwright, linting).
 
 ## Test Architecture
 
 Tests are **BDD integration tests** — they use a real DB, not mocks. There is no unit test layer for DB adapters.
 
 Key fixtures (all in `tests/bdd/conftest.py`):
-- `db_engine` — session-scoped async SQLAlchemy engine
-- `clean_tables` — autouse; runs `DELETE FROM jobs; DELETE FROM worker_status` after each scenario
+- `clean_tables` — autouse; runs `DELETE FROM jobs; DELETE FROM worker_status` after each scenario via `db_run()`
 - `ctx` — per-scenario `SimpleNamespace` with `response`, `job_ids`, `worker_ids` dicts
 - `fake_health` — `FakeWorkerHealthClient`; configure per-worker responses with `set_healthy(wid)` / `set_unhealthy(wid)`; tracks `probed` list
-- `scheduler_app` — bare FastAPI app with real DB adapters, no background loops
-- `http_client` — `httpx.AsyncClient` pointed at `scheduler_app`
-- `job_db` / `worker_status_db` — raw worker-agent DB adapters for worker management tests
+- `scheduler_app` — bare FastAPI app with real DB adapters, no background loops; fresh `AsyncEngine` per test
+- `http_client` — `starlette.testclient.TestClient` wrapping `scheduler_app` (sync, runs ASGI in background thread)
+- `db_run(coro_fn, *args, **kwargs)` — sync helper; creates a fresh engine, runs the coroutine, disposes — use this in all step functions for DB access
 
-Background loops (ready-transition, health-check) are tested by calling their `_run_*_once()` methods directly — they are never started as background tasks in tests.
+All fixtures and step functions are **synchronous** — pytest-bdd 8 calls steps via a sync mechanism. Use `db_run()` for DB ops and `TestClient` for HTTP; never use `async def` step functions.
+
+Background loops (ready-transition, health-check) are tested by calling their `_run_*_once()` methods directly via `db_run()` — never started as background tasks in tests.
 
 ## Coding Conventions
 
@@ -78,7 +48,7 @@ All timing constants must be imported from `src/lightcron/constants.py` — no n
 
 Step definitions in `tests/bdd/steps/`:
 - Steps reused across multiple feature files live in `tests/bdd/steps/conftest.py`
-- All `@scenario` test functions must be `async def` (pytest-bdd 8 + asyncio_mode=auto)
+- All `@scenario` functions and step functions must be plain `def` (not `async def`) — pytest-bdd 8 is synchronous
 - Use `parsers.parse(...)` for any step with a variable; bare strings for fixed steps
 
 Frontend conventions (FSD layer import rule):

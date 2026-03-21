@@ -45,7 +45,7 @@ services:
       dockerfile: docker/scheduler/Dockerfile
     environment:
       DATABASE_URL: postgresql+asyncpg://lightcron:lightcron@db:5432/lightcron
-      PGBOUNCER_URL: postgresql+asyncpg://lightcron:lightcron@pgbouncer:6432/lightcron
+      PGBOUNCER_URL: postgresql+asyncpg://lightcron:lightcron@pgbouncer:5432/lightcron
       LIGHTCRON_UI_ORIGIN: http://localhost:5173
     depends_on:
       pgbouncer:
@@ -55,7 +55,7 @@ services:
     volumes:
       - ./src:/app/src
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -65,7 +65,7 @@ services:
       context: .
       dockerfile: docker/worker/Dockerfile
     environment:
-      PGBOUNCER_URL: postgresql+asyncpg://lightcron:lightcron@pgbouncer:6432/lightcron
+      PGBOUNCER_URL: postgresql+asyncpg://lightcron:lightcron@pgbouncer:5432/lightcron
       WORKER_CONCURRENCY: 2
     depends_on:
       pgbouncer:

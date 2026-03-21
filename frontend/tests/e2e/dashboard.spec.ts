@@ -1,20 +1,19 @@
 /**
  * Playwright E2E tests for system-dashboard.feature (J009).
  *
- * These tests rely on:
- *   - The Lightcron scheduler running at VITE_API_BASE_URL (default: http://localhost:8000)
- *   - The web UI accessible at PLAYWRIGHT_BASE_URL (default: http://localhost:5173)
+ * DB state is seeded before each test via:
+ *   - REST API (POST /jobs, POST /jobs/:id/cancel) for states the API supports
+ *   - Direct DB insert (db-helpers.ts) for workers and terminal job statuses
  *
- * DB state is seeded via the REST API before each test; cleaned up with cancelation.
+ * cleanTables() runs before every test so each test starts from a known empty state.
  */
 
-import { test, expect, type APIRequestContext } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import axios from "axios";
+import { cleanTables, insertWorker, insertJob } from "./db-helpers.js";
 
 const API_BASE = process.env.VITE_API_BASE_URL ?? "http://localhost:8000";
 const api = axios.create({ baseURL: API_BASE });
-
-// ── Helpers ────────────────────────────────────────────────────────────────
 
 async function createJob(overrides: Record<string, unknown> = {}) {
   const { data } = await api.post("/jobs", {
@@ -33,46 +32,96 @@ async function cancelJob(jobId: string) {
   }
 }
 
-// ── Dashboard: worker fleet panel ─────────────────────────────────────────
+test.beforeEach(async () => {
+  await cleanTables();
+});
+
+// ── Worker fleet panel ─────────────────────────────────────────────────────
 
 test("Dashboard shows empty state when no workers are registered", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("No workers registered")).toBeVisible();
 });
 
+test("Dashboard shows online workers with their running job counts", async ({ page }) => {
+  const wid1 = await insertWorker({ hostname: "worker-01", status: "online" });
+  const wid2 = await insertWorker({ hostname: "worker-02", status: "online" });
+  await insertJob({ status: "running", workerId: wid1 });
+  await insertJob({ status: "running", workerId: wid1 });
+
+  await page.goto("/");
+
+  const row1 = page.locator("tr", { hasText: "worker-01" });
+  const row2 = page.locator("tr", { hasText: "worker-02" });
+
+  await expect(row1).toBeVisible({ timeout: 5000 });
+  await expect(row1.locator("span").filter({ hasText: /^online$/ })).toBeVisible();
+  // Running Jobs is the 4th column (last td)
+  await expect(row1.locator("td").last()).toHaveText("2");
+
+  await expect(row2).toBeVisible();
+  await expect(row2.locator("span").filter({ hasText: /^online$/ })).toBeVisible();
+  await expect(row2.locator("td").last()).toHaveText("0");
+});
+
+test("Dashboard shows an offline worker", async ({ page }) => {
+  await insertWorker({ hostname: "worker-03", status: "offline" });
+
+  await page.goto("/");
+
+  const row = page.locator("tr", { hasText: "worker-03" });
+  await expect(row).toBeVisible({ timeout: 5000 });
+  await expect(row.locator("span").filter({ hasText: /^offline$/ })).toBeVisible();
+});
+
+// ── Jobs panel ─────────────────────────────────────────────────────────────
+
 test("Dashboard shows empty state when no jobs exist", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByText("No jobs")).toBeVisible();
 });
 
-// ── Dashboard: jobs panel ─────────────────────────────────────────────────
-
 test("Dashboard shows pending jobs with correct status", async ({ page }) => {
   const job = await createJob();
   try {
     await page.goto("/");
-    // Wait for jobs panel to load (initial fetch)
     await expect(
-      page.locator("text=pending").first()
+      page.locator("span").filter({ hasText: /^pending$/ }).first()
     ).toBeVisible({ timeout: 5000 });
   } finally {
     await cancelJob(job.job_id);
   }
 });
 
-// ── Dashboard: status filter ───────────────────────────────────────────────
+test("Dashboard shows running, completed, and failed jobs", async ({ page }) => {
+  const wid = await insertWorker({ hostname: "worker-01" });
+  await insertJob({ status: "running", workerId: wid });
+  await insertJob({ status: "completed", workerId: wid });
+  await insertJob({ status: "failed", workerId: wid });
+
+  await page.goto("/");
+
+  await expect(
+    page.locator("span").filter({ hasText: /^running$/ }).first()
+  ).toBeVisible({ timeout: 5000 });
+  await expect(
+    page.locator("span").filter({ hasText: /^completed$/ }).first()
+  ).toBeVisible();
+  await expect(
+    page.locator("span").filter({ hasText: /^failed$/ }).first()
+  ).toBeVisible();
+});
+
+// ── Status filter ──────────────────────────────────────────────────────────
 
 test("Jobs panel can be filtered by status", async ({ page }) => {
   const job = await createJob();
   try {
     await page.goto("/");
-    // Select "pending" from the status filter
     await page.selectOption("select", "pending");
-    // Pending job should be visible
     await expect(
-      page.locator("text=pending").first()
+      page.locator("span").filter({ hasText: /^pending$/ }).first()
     ).toBeVisible({ timeout: 5000 });
-    // Select "running" — no running jobs seeded → empty state
     await page.selectOption("select", "running");
     await expect(page.getByText("No jobs")).toBeVisible({ timeout: 5000 });
   } finally {
@@ -80,47 +129,52 @@ test("Jobs panel can be filtered by status", async ({ page }) => {
   }
 });
 
-// ── Dashboard: auto-refresh ────────────────────────────────────────────────
+test("Jobs panel filter shows running jobs and hides completed jobs", async ({ page }) => {
+  const wid = await insertWorker({ hostname: "worker-01" });
+  await insertJob({ status: "running", workerId: wid, command: "echo running-job" });
+  await insertJob({ status: "completed", workerId: wid, command: "echo completed-job" });
+
+  await page.goto("/");
+
+  await page.selectOption("select", "running");
+  await expect(
+    page.locator("span").filter({ hasText: /^running$/ }).first()
+  ).toBeVisible({ timeout: 5000 });
+  await expect(
+    page.locator("span").filter({ hasText: /^completed$/ })
+  ).toHaveCount(0);
+});
+
+// ── Auto-refresh ───────────────────────────────────────────────────────────
 
 test("Dashboard auto-refreshes and reflects updated job status", async ({ page }) => {
-  // Create a pending job
   const job = await createJob();
   try {
     await page.goto("/");
-
-    // Confirm job appears as pending
     await expect(
-      page.locator("text=pending").first()
+      page.locator("span").filter({ hasText: /^pending$/ }).first()
     ).toBeVisible({ timeout: 5000 });
 
-    // Cancel the job (transitions to cancelled) — simulates a state change
     await cancelJob(job.job_id);
-
-    // Select "cancelled" in the filter to verify auto-refresh shows updated state
     await page.selectOption("select", "cancelled");
 
-    // The dashboard should auto-refresh within DASHBOARD_REFRESH_INTERVAL_MS (10s)
-    // but we also wait up to 15s in test to account for timing
     await expect(
-      page.locator("text=cancelled").first()
+      page.locator("span").filter({ hasText: /^cancelled$/ }).first()
     ).toBeVisible({ timeout: 15000 });
   } finally {
-    // Already cancelled above; best effort cleanup
     try { await cancelJob(job.job_id); } catch { /* ignore */ }
   }
 });
 
-// ── Navigation ────────────────────────────────────────────────────────────
+// ── Navigation ─────────────────────────────────────────────────────────────
 
 test("Navigation links work correctly", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/Lightcron/);
 
-  // Click "Schedule Job" nav link
   await page.getByRole("link", { name: "Schedule Job" }).click();
   await expect(page).toHaveURL(/\/jobs\/new/);
 
-  // Click "Dashboard" nav link
   await page.getByRole("link", { name: "Dashboard" }).click();
   await expect(page).toHaveURL(/\/$/);
 });

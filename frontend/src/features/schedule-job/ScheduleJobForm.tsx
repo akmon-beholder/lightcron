@@ -94,7 +94,7 @@ export function ScheduleJobForm() {
     clientErrors[key] ?? serverFieldError(key);
 
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} style={{ maxWidth: 480 }}>
+    <form onSubmit={(e) => void handleSubmit(e)} noValidate style={{ maxWidth: 480 }}>
       {serverError?.genericMessage && (
         <p
           style={{

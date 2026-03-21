@@ -137,21 +137,32 @@ uv run python -m pytest tests/integration/ -v
 
 ### Frontend Playwright e2e tests
 
-```bash
-# Start the full stack including the UI
-docker compose --profile ui up -d --wait
+The Playwright tests require:
+- The scheduler API running at `http://localhost:8000`
+- A clean database (no registered workers — the worker container must not be running)
+- Node.js 20+ with npm (use [nvm](https://github.com/nvm-sh/nvm) if needed)
 
-# Install Node dependencies and Playwright browsers
+```bash
+# Start only the scheduler stack (no worker, no docker UI)
+docker compose up db pgbouncer scheduler -d --wait
+
+# Install Node dependencies and Playwright browsers (first time only)
 cd frontend
 npm install
-npx playwright install --with-deps chromium
+npx playwright install chromium   # --with-deps requires sudo; omit if browsers already cached
 
-# Run Playwright tests
+# Run Playwright tests (Playwright starts/stops the Vite dev server automatically)
+VITE_API_BASE_URL=http://localhost:8000 \
+DATABASE_URL=postgresql://lightcron:lightcron@localhost:5432/lightcron \
 npx playwright test
 
 # Run in headed mode (useful for debugging)
+VITE_API_BASE_URL=http://localhost:8000 \
+DATABASE_URL=postgresql://lightcron:lightcron@localhost:5432/lightcron \
 npx playwright test --headed
 ```
+
+> **Note**: The docker `ui` profile service is for running the full stack in production-like mode. For testing, Playwright manages the Vite dev server itself via `webServer` in `playwright.config.ts`.
 
 ### Linting and type checking
 
