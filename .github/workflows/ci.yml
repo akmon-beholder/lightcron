@@ -72,11 +72,12 @@ jobs:
           python-version: "3.12"
       - run: pip install -e ".[dev]"
 
-      # ops condition C2: alembic check before upgrade
-      - name: Check for pending migrations
-        run: alembic check
       - name: Apply migrations
         run: alembic upgrade head
+
+      # ops condition C2: verify no uncommitted model changes after upgrade
+      - name: Check for pending migrations
+        run: alembic check
 
       # ops condition C3: FK integrity validation
       - name: FK integrity check
@@ -104,15 +105,15 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Start Docker Compose stack
-        run: docker compose --profile ui up -d --wait
-        timeout-minutes: 5
-
       - name: Install Playwright
         working-directory: frontend
         run: |
           npm ci
           npx playwright install --with-deps chromium
+
+      - name: Start Docker Compose stack
+        run: docker compose --profile ui up -d --wait
+        timeout-minutes: 5
 
       - name: Run Playwright tests
         working-directory: frontend
