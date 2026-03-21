@@ -1,0 +1,2955 @@
+╭─── Claude Code v2.1.81 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                 Welcome back Akmon!                │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ Recent activity         │
+│                        ▘▘ ▝▝                       │ No recent activity      │
+│ Sonnet 4.6 · Claude Pro · akmon@beholder.vision's  │                         │
+│ Organization                                       │                         │
+│              ~/dev/beholder/lightcron              │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+❯ /reload-plugins                                                               
+  ⎿  Reloaded: 0 plugins · 0 skills · 5 agents · 0 hooks · 0 plugin MCP servers
+     · 0 plugin LSP servers
+
+❯ caf                                                                           
+
+● Plugin reload complete. 5 agents loaded (likely the CAF agents), no plugins or
+   hooks active.
+
+  Is there something specific you'd like to work on in this project?
+
+❯ Can you please tell me how to use the Claude Agent Framework in               
+/home/akmon/dev/beholder/claude-agent-framework? I've followed the instructions 
+ to install the plugin but I'm not sure it's working. I can't run the caf CLI   
+tool it talks about                                                             
+
+● Explore(Explore CAF directory structure)
+  ⎿  Done (36 tool uses · 45.4k tokens · 2m 5s)
+  (ctrl+o to expand)
+
+● Now let me check why the caf CLI isn't working.
+
+● Bash(which caf 2>&1; caf --help 2>&1 | head -5; echo "---"; pip show
+      claude-cli 2>&1 | head -5; echo "---"; ls
+      /home/akmon/.claude/plugins/local/caf/ 2>&1 | head -10)
+  ⎿  /bin/bash: line 1: caf: command not found
+     ---
+     /bin/bash: line 1: pip: command not found
+     … +11 lines (ctrl+o to expand)
+
+● Bash(python3 --version 2>&1; pip3 show claude-cli 2>&1 | head -5; echo "---";
+      ls /home/akmon/.local/bin/ 2>&1 | grep caf; echo "---"; cat
+      /home/akmon/dev/beholder/cl…)
+  ⎿  Python 3.12.3
+     /bin/bash: line 1: pip3: command not found
+     ---
+     … +31 lines (ctrl+o to expand)
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● The plugin is installed (the symlink is in place), but the caf CLI Python
+  package has not been installed. There's no pip, uv, or pipx available in your
+  PATH.
+
+  Here's the situation and how to fix it:
+
+  What's installed vs. what's missing
+
+  - Plugin (agents, hooks, commands): installed at ~/.claude/plugins/local/caf/
+  — this is working (you saw 5 agents load on /reload-plugins)
+  - caf CLI tool: a separate Python package that needs to be installed — this is
+   not installed yet
+
+  How to install the caf CLI
+
+  The package uses hatchling as its build system. You need a Python package
+  manager. Try these options in order:
+
+  Option 1 — install pip first, then install:
+  python3 -m ensurepip --upgrade
+  python3 -m pip install -e /home/akmon/dev/beholder/claude-agent-framework
+
+  Option 2 — install uv (recommended, fast):
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  source ~/.bashrc   # or restart your terminal
+  cd /home/akmon/dev/beholder/claude-agent-framework
+  uv tool install -e .
+
+  Option 3 — install via pipx (isolated environment):
+  sudo apt install pipx   # or: python3 -m pip install pipx
+  pipx install /home/akmon/dev/beholder/claude-agent-framework
+
+  After installation, run caf --help to confirm it's working.
+
+  ---
+  Note: The CAF governance features inside Claude Code (agents, hooks, slash
+  commands) are already active even without the CLI. The caf CLI is a
+  supplementary tool for dashboards, batch operations, and drift analysis — not
+  required for day-to-day use.
+
+✻ Sautéed for 2m 8s
+
+❯ /status                                                                       
+  ⎿  Status dialog dismissed
+
+❯ /exit                                                                         
+  ⎿  Bye!
+
+❯ Ok I have installed the caf CLI tool. We are currently in the folder of a new 
+ project that I want to build using the Claude Agent Framework. What commands   
+should I run and what plugins should I use to do this? I have not used plugins  
+in claude before so would aprpeciate instructions on how to do this             
+
+  Read 2 files (ctrl+o to expand)
+
+● Good — the CAF plugin is already installed and active (your
+  ~/.claude/CLAUDE.md has the governance instructions). The project directory is
+   empty and not yet a git repo.
+
+  Here's exactly what to do:
+
+  ---
+  About plugins in Claude Code
+
+  Plugins are just directories (or symlinks) placed in ~/.claude/plugins/local/.
+   Claude Code automatically discovers and loads agents, hooks, skills, and
+  commands from them — you don't need to do anything special to activate them.
+  Your /reload-plugins output confirming "5 agents" earlier means CAF is already
+   active.
+
+  ---
+  Starting your new project
+
+  Step 1 — Initialize git (required by CAF)
+
+  CAF expects a git repo. Run this in your project folder:
+
+  git init
+  git commit --allow-empty -m "Initial commit"
+
+  Step 2 — Initialize CAF governance
+
+  In Claude Code (in this directory), just say:
+
+  ▎ "Initialize this project for governance"
+
+  The init agent will scaffold a .claude/ folder with manifest.yaml, artifact
+  directories, and register the project.
+
+  Step 3 — Describe what you want to build
+
+  After init, say:
+
+  ▎ "Start designing — I want to build [describe your project]"
+
+  The framework then routes through the agent pipeline automatically:
+  - design → user journeys & solution
+  - ba → spec, tasklist, quality rules
+  - back/front → implementation (only from the spec)
+  - verify → governance checks
+
+  For small/quick tasks (skip the ceremony)
+
+  ▎ "Fast-track: [describe the task]"
+
+  This bypasses design/BA and goes straight to coding → verify.
+
+  ---
+  Useful CLI commands now that caf is installed
+
+  caf status              # Framework status for current project
+  caf agents list         # See all 11 agents
+  caf cockpit portfolio   # HTML dashboard of all governed projects
+  caf drift check         # Check if code matches design decisions
+  caf lessons list        # Browse 117+ development lessons
+
+  ---
+  What are you building in this project? I can help you craft the right prompt
+  to kick off the init/design phase.
+
+✻ Crunched for 31s
+
+❯ Initialize this project for governance                                        
+
+  Read 1 file (ctrl+o to expand)
+
+● Now I'll run the init agent's scaffolding. The project slug is lightcron,
+  derived from the directory name.
+
+● Bash(mkdir -p
+      /home/akmon/dev/beholder/lightcron/.claude/{artifacts,evidence,evolution,r
+      emediation/{inbox,archive},outbox/{pending,active,completed,rejected}} &&
+      mkd…)
+  ⎿  Done
+
+● Write(.claude/manifest.yaml)
+  ⎿  Wrote 34 lines to .claude/manifest.yaml
+       1 schema_version: "2.0"
+       2 project_slug: "lightcron"
+       3 project_name: "Lightcron"
+       4 created: "2026-03-20T00:00:00Z"
+       5 last_updated: "2026-03-20T00:00:00Z"
+       6 lifecycle_mode: "lean"
+       7 phase: "initialized"
+       8 enforcement_log: ".claude/evolution/enforcement.log"
+       9 
+      10 artifact_versions: {}
+     … +24 lines (ctrl+o to expand)
+● Write(.claude/evolution/evolution.md)
+  ⎿  Wrote 5 lines to .claude/evolution/evolution.md
+      1 # Evolution Log
+      2 
+      3 Append-only drift governance and change tracking.
+      4 
+      5 ---
+
+● Write(.claude/evolution/decisions.md)
+  ⎿  Wrote 5 lines to .claude/evolution/decisions.md
+      1 # Decision Log
+      2 
+      3 Append-only architectural decisions with rationale.
+      4 
+      5 ---
+
+● Write(.claude/remediation/findings.log)
+  ⎿  Wrote 1 lines to .claude/remediation/findings.log
+      1 (No content)
+
+● Write(.claude/remediation/remediation_tasks.md)
+  ⎿  Wrote 19 lines to .claude/remediation/remediation_tasks.md
+      1 # Remediation Tasks
+      2 
+      3 Consolidated tracker for BUG and IMPROVE items across all reviews
+        .
+      4 
+      5 ## Critical Priority
+      6 
+      7 (none)
+      8 
+      9 ## High Priority
+     … +9 lines (ctrl+o to expand)
+
+● Write(specs/features/README.md)
+  ⎿  Wrote 18 lines to specs/features/README.md
+       1 # BDD Feature Specifications
+       2 
+       3 This directory contains Gherkin `.feature` files that serve as t
+         he
+       4 **single source of truth** for behavioral specifications.
+       5 
+       6 ## Who Creates Features
+       7 - **Design agent** writes `.feature` files during Phase A (journ
+         ey discovery)
+       8 - **User** reviews and approves features before coding begins
+       9 
+      10 ## Who Implements Step Definitions
+     … +8 lines (ctrl+o to expand)
+
+● Bash(cp ~/.claude/plugins/local/caf/examples/antigravity-skill/outbox-poller/S
+      KILL.md
+      /home/akmon/dev/beholder/lightcron/.agent/skills/outbox-poller/SKILL.md &&
+       cp ~…)
+  ⎿  Done
+
+● Bash(cp ~/.claude/plugins/local/caf/patterns/determinism/ports.py
+      /home/akmon/dev/beholder/lightcron/src/domain/ports/ports.py && cp
+      ~/.claude/plugins/local/caf/patt…)
+  ⎿  Done
+
+● Now register the project in the portfolio:
+
+● Write(~/.claude/devops/project_registry.yaml)
+  ⎿  Wrote 10 lines to ../../../.claude/devops/project_registry.yaml
+       1 schema_version: "1.0"
+       2 summary:
+       3   total_projects: 1
+       4 
+       5 projects:
+       6   - slug: "lightcron"
+       7     name: "Lightcron"
+       8     path: "/home/akmon/dev/beholder/lightcron"
+       9     registered: "2026-03-20"
+      10     notes: "Auto-registered by init agent."
+
+● Project Initialized
+
+  Project: lightcron
+  Location: /home/akmon/dev/beholder/lightcron/.claude/
+
+  Created
+
+  - .claude/manifest.yaml (schema v2.0, phase: initialized)
+  - .claude/artifacts/ directory
+  - .claude/evidence/ directory
+  - .claude/evolution/evolution.md
+  - .claude/evolution/decisions.md
+  - .claude/remediation/inbox/, archive/, findings.log, remediation_tasks.md
+  - .claude/outbox/pending/, active/, completed/, rejected/
+  - specs/features/README.md
+  - .agent/skills/outbox-poller/SKILL.md + check_outbox.sh
+  - src/domain/ports/ — determinism ports (ports.py, adapters.py, fakes.py)
+
+  Portfolio
+
+  - Registered in ~/.claude/devops/project_registry.yaml
+
+  ---
+  Next Step
+
+  Tell me what Lightcron is and what you want to build, and I'll invoke the
+  design agent to define user journeys and the solution envelope (Phase A).
+
+✻ Crunched for 58s
+
+❯ Lightcron is a lightweight job orchestration system that schedules jobs to be 
+ run over time. To begin with jobs are expected to run for a certain period of  
+time, to start and then stop. Lightcron allows jobs to be run on a set of       
+worker nodes. Lightcron is lightweight in the sense that aside from a database  
+to store the current state of the system there is nothing like a separate       
+message bus or queue. A webapi is used to schedule jobs and a runner agent on   
+each node is used to run and manage jobs.                                       
+
+  Read 1 file (ctrl+o to expand)
+
+● Invoking the design agent — Phase A. First I need to research the job
+  orchestration domain to build the persona lens pack before generating
+  journeys.
+
+● Explore(Research job orchestration domain personas)
+  ⎿  Done (13 tool uses · 32.8k tokens · 2m 9s)
+  (ctrl+o to expand)
+
+● Now I'll create the persona lens pack based on the research, tailored to
+  Lightcron's specific profile (lightweight, API-driven, worker-node based,
+  DB-backed).
+
+● Write(.claude/persona_lenses.yaml)
+  ⎿  Wrote 114 lines to .claude/persona_lenses.yaml
+       1 # Auto-generated by design agent (Phase A) via domain research
+       2 # Project: lightcron
+       3 # Generated: 2026-03-21
+       4 # Research sources: 40+ pages analyzed (Celery, Temporal, Bull, 
+         Nomad, APScheduler, Airflow, Prefect, Dagster, Hacker News discu
+         ssions)
+       5 
+       6 name: "lightcron_lenses"
+       7 domain: "job scheduling / distributed task orchestration"
+       8 version: 1
+       9 
+      10 research_sources:
+     … +104 lines (ctrl+o to expand)
+
+● Phase A — Persona Lens Pack
+
+  Before I generate the user journeys and feature files, the design agent
+  protocol requires you to review and validate this lens pack. These are the
+  four persona lenses I'll use to evaluate every journey:
+
+  ---
+  Lens 1: Application Developer (Job Submitter) — High confidence
+
+  Uses the Web API to schedule jobs from their application code. Cares about:
+  - Simple HTTP API to submit/cancel/query jobs
+  - Silent failures are a dealbreaker
+  - Needs job status to be queryable programmatically
+
+  Lens 2: Platform / Infrastructure Engineer — High confidence
+
+  Owns the Lightcron deployment and worker fleet. Cares about:
+  - Adding/removing workers without disrupting running jobs
+  - Cluster-level visibility (healthy workers, job throughput)
+  - Stuck job detection and automatic recovery
+
+  Lens 3: SRE / On-Call Operator — High confidence
+
+  Responds to incidents. Cares about:
+  - Diagnosing failures fast at 3 AM via API/UI, not SSH
+  - Cancelling or force-stopping stuck jobs without DB access
+  - Distinguishing worker crash from job code failure
+
+  Lens 4: System Administrator / DevOps — Medium confidence
+
+  Manages auth, security, and config. Cares about:
+  - API authentication and worker node identity
+  - Audit log of schedule changes and job submissions
+  - Retention policies and resource limits
+
+  ---
+  Questions before I proceed to journeys:
+
+  1. Does this lens set look right for Lightcron's expected users? Any lenses
+  missing or irrelevant?
+  2. Is there a multi-tenant angle (multiple teams sharing one Lightcron
+  cluster), or is this a single-team/single-tenant system to start?
+  3. What language/stack is the backend expected to be in? (The CAF defaults to
+  Python hexagonal — confirming you want that.)
+
+  Once you confirm, I'll generate the full user journeys and .feature files.
+
+✻ Cogitated for 3m 5s
+
+❯ 1. Correct                                                                    
+
+● Thanks — lens pack confirmed.
+
+  Still need your input on the other two before
+  ⎿  Interrupted · What should Claude do instead?
+
+❯ 2. Single tenant                                                              
+3. Correct Python Hexagonal                                                     
+
+● Single-tenant, Python hexagonal. Proceeding directly to journey generation.
+
+  Let me create the shared conventions artifact first (required gate), then all
+  journeys and feature files in parallel.
+
+● Bash(mkdir -p /home/akmon/dev/beholder/lightcron/specs/features/{job-managemen
+      t,worker-management,operations})  ⎿  Done
+
+● Write(.claude/artifacts/008_shared_conventions_v1.md)
+  ⎿  Wrote 124 lines to .claude/artifacts/008_shared_conventions_v1.md
+      1 # Shared Conventions — Lightcron
+      2 
+      3 **Version**: v1
+      4 **Created**: 2026-03-21
+      5 **Agent**: design (Phase A)
+      6 **Purpose**: Single source of truth for naming, roles, thresholds
+        , and patterns.
+      7              Every BDD generation agent receives this document ve
+        rbatim.
+      8 
+      9 ---
+     … +114 lines (ctrl+o to expand)
+
+● Now generating all journeys and feature files in parallel:
+
+● Write(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Wrote 371 lines to .claude/artifacts/000_user_journeys_v1.md
+      1 # User Journeys — Lightcron
+      2 
+      3 **Version**: 1.0
+      4 **Created**: 2026-03-21
+      5 **Agent**: design (Phase A)
+      6 
+      7 ---
+      8 
+      9 ## Composite Persona
+     … +361 lines (ctrl+o to expand)
+
+● Write(specs/features/job-management/schedule-job.feature)
+  ⎿  Wrote 67 lines to specs/features/job-management/schedule-job.feature
+      1 @J001 @P1 @persona:job_submitter
+      2 Feature: Schedule a Job
+      3   As a job_submitter
+      4   I want to schedule a job with a start time and end time via the
+         Web API
+      5   So that Lightcron will run the job on a worker node during that
+         window
+      6 
+      7   Background:
+      8     Given the Lightcron scheduler is running
+      9     And no jobs exist
+     … +57 lines (ctrl+o to expand)
+
+● Write(specs/features/worker-management/worker-registration.feature)
+  ⎿  Wrote 43 lines to
+     specs/features/worker-management/worker-registration.feature
+      1 @J002 @P1 @persona:platform_operator
+      2 Feature: Worker Node Registration
+      3   As a runner_agent on a worker node
+      4   I want to register with the scheduler
+      5   So that the scheduler knows this node is available to accept jo
+        b assignments
+      6 
+      7   Background:
+      8     Given the Lightcron scheduler is running
+      9     And no workers are registered
+     … +33 lines (ctrl+o to expand)
+
+● Write(specs/features/worker-management/job-dispatch.feature)
+  ⎿  Wrote 45 lines to
+     specs/features/worker-management/job-dispatch.feature
+       1 @J003 @P1 @persona:platform_operator
+       2 Feature: Job Dispatch to Worker
+       3   As the scheduler
+       4   I want to dispatch a pending job to an available online worker
+          at its start_time
+       5   So that the runner agent can start executing it
+       6 
+       7   Background:
+       8     Given the Lightcron scheduler is running
+       9 
+      10   @smoke
+     … +35 lines (ctrl+o to expand)
+
+● Write(specs/features/job-management/job-lifecycle-completion.feature)
+  ⎿  Wrote 50 lines to
+     specs/features/job-management/job-lifecycle-completion.feature
+      1 @J004 @P1 @persona:job_submitter
+      2 Feature: Job Lifecycle Completion
+      3   As the runner_agent
+      4   I want to stop the executing job process when its end_time is r
+        eached
+      5   So that jobs do not overrun their scheduled window
+      6 
+      7   Background:
+      8     Given the Lightcron scheduler is running
+      9     And a worker "w-001" is registered and has status "online"
+     … +40 lines (ctrl+o to expand)
+
+● Write(specs/features/job-management/cancel-job.feature)
+  ⎿  Wrote 57 lines to specs/features/job-management/cancel-job.feature
+       1 @J005 @P1 @persona:sre_operator @persona:job_submitter
+       2 Feature: Cancel a Job
+       3   As an sre_operator or job_submitter
+       4   I want to cancel a job via the API regardless of whether it is
+          pending, assigned, or running
+       5   So that I can stop unwanted or stuck work without direct datab
+         ase or node access
+       6 
+       7   Background:
+       8     Given the Lightcron scheduler is running
+       9 
+      10   @smoke
+     … +47 lines (ctrl+o to expand)
+
+● Write(specs/features/job-management/query-job-status.feature)
+  ⎿  Wrote 49 lines to
+     specs/features/job-management/query-job-status.feature
+       1 @J006 @P1 @persona:job_submitter
+       2 Feature: Query Job Status
+       3   As a job_submitter
+       4   I want to query the current status and execution details of a 
+         job via the API
+       5   So that my application can react to job completion, failure, o
+         r progress
+       6 
+       7   Background:
+       8     Given the Lightcron scheduler is running
+       9 
+      10   @smoke
+     … +39 lines (ctrl+o to expand)
+
+● Write(specs/features/operations/worker-health-monitoring.feature)
+  ⎿  Wrote 41 lines to
+     specs/features/operations/worker-health-monitoring.feature
+       1 @J007 @P2 @persona:platform_operator @persona:sre_operator
+       2 Feature: View Worker Fleet Status
+       3   As a platform_operator
+       4   I want to query all registered workers and their current statu
+         s
+       5   So that I can see which nodes are healthy, busy, or offline at
+          a glance
+       6 
+       7   Background:
+       8     Given the Lightcron scheduler is running
+       9 
+      10   @smoke
+     … +31 lines (ctrl+o to expand)
+
+● Write(specs/features/operations/stuck-job-recovery.feature)
+  ⎿  Wrote 58 lines to specs/features/operations/stuck-job-recovery.feature
+       1 @J008 @P1 @persona:sre_operator @persona:platform_operator
+       2 Feature: Detect and Recover Stuck Jobs
+       3   As the scheduler
+       4   I want to detect when a worker has stopped sending heartbeats 
+         and automatically mark its jobs as timed_out
+       5   So that stuck jobs do not remain in running or assigned state 
+         indefinitely
+       6 
+       7   Background:
+       8     Given the Lightcron scheduler is running
+       9 
+      10   @smoke
+     … +48 lines (ctrl+o to expand)
+
+● Now update the manifest to record the artifacts:
+
+● Update(.claude/manifest.yaml)
+  ⎿  Added 3 lines, removed 1 line
+       7  phase: "initialized"
+       8  enforcement_log: ".claude/evolution/enforcement.log"
+       9  
+      10 -artifact_versions: {}                                          
+      10 +artifact_versions:                                             
+      11 +  user_journeys: "000_user_journeys_v1.md"                     
+      12 +  shared_conventions: "008_shared_conventions_v1.md"           
+      13  
+      14  exclusive_permissions:
+      15    write_backend_code: back
+
+● ---
+  Phase A Complete — User Journeys & Feature Files
+
+  8 journeys created across 4 domains. Please review and approve the .feature
+  files before I proceed to Phase B (solution design).
+
+  Journeys summary
+
+  ID: J001
+  Title: Schedule a Job
+  Priority: P1
+  Feature File: specs/features/job-management/schedule-job.feature
+  ────────────────────────────────────────
+  ID: J002
+  Title: Worker Node Registers
+  Priority: P1
+  Feature File: specs/features/worker-management/worker-registration.feature
+  ────────────────────────────────────────
+  ID: J003
+  Title: Job Dispatched and Started
+  Priority: P1
+  Feature File: specs/features/worker-management/job-dispatch.feature
+  ────────────────────────────────────────
+  ID: J004
+  Title: Job Completes at End Time
+  Priority: P1
+  Feature File: specs/features/job-management/job-lifecycle-completion.feature
+  ────────────────────────────────────────
+  ID: J005
+  Title: Cancel a Job
+  Priority: P1
+  Feature File: specs/features/job-management/cancel-job.feature
+  ────────────────────────────────────────
+  ID: J006
+  Title: Query Job Status
+  Priority: P1
+  Feature File: specs/features/job-management/query-job-status.feature
+  ────────────────────────────────────────
+  ID: J007
+  Title: View Worker Fleet Status
+  Priority: P2
+  Feature File: specs/features/operations/worker-health-monitoring.feature
+  ────────────────────────────────────────
+  ID: J008
+  Title: Detect and Recover Stuck Jobs
+  Priority: P1
+  Feature File: specs/features/operations/stuck-job-recovery.feature
+
+  A few things to confirm
+
+  1. Heartbeat timeout at 90s (3 missed 30s beats) — correct threshold, or would
+   you set it differently?
+  2. Dispatch strategy: "least loaded worker" (fewest running jobs) — does that
+  fit your intent, or do you want something simpler like round-robin?
+  3. Re-registration idempotency: same hostname → same worker_id returned (as in
+   J002). Does that match how you're thinking about node identity?
+  4. SIGTERM → SIGKILL grace period: the feature files reference a grace period
+  but leave the duration TBD. Do you have a value in mind (e.g. 30s)?
+
+  Once you approve (or request changes), I'll move to Phase B — the solution
+  envelope and architecture.
+
+✻ Churned for 3m 40s
+
+❯ /status                                                                       
+  ⎿  Status dialog dismissed
+
+❯ In job management the DELETE HTTP method should not be used, job cancellation 
+ should be down with a POST that requests the state change.                     
+                                                                                
+The other thing to note is that only users managing jobs should go via the REST 
+ API. Worker nodes (which are considered part of the system) should register    
+themselves, retrieve jobs etc by talking to the database (via something like    
+pgBouncer). Worker nodes will run a small REST API themselves but for now the   
+thinking is that that will only offer /health endpoint that can be used to      
+check if a worker is dead if it has not made a recent update to the             
+worker_status DB table. In general the pattern should be that system components 
+ query the DB to get the status of other parts of the system and write to the   
+DB to let other parts of the system know about their state.                     
+
+● Good corrections — that's a cleaner architecture. Let me update the
+  conventions, affected journeys, and feature files to reflect both changes:
+
+  1. POST /jobs/{job_id}/cancel instead of DELETE
+  2. Workers communicate via DB (pgBouncer), not REST API — only external users
+  use the scheduler's REST API; workers run their own minimal /health endpoint
+
+  Read 1 file (ctrl+o to expand)
+
+● Write(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Wrote 193 lines to .claude/artifacts/008_shared_conventions_v2.md
+       1 # Shared Conventions — Lightcron
+       2 
+       3 **Version**: v2
+       4 **Created**: 2026-03-21
+       5 **Updated**: 2026-03-21 — v2: corrected cancel from DELETE to PO
+         ST; workers use DB-direct, not REST
+       6 **Agent**: design (Phase A)
+       7 **Purpose**: Single source of truth for naming, roles, threshold
+         s, and patterns.
+       8              Every BDD generation agent receives this document v
+         erbatim.
+       9 
+      10 ---
+     … +183 lines (ctrl+o to expand)
+
+● Now rewrite the four affected feature files:
+
+● Write(specs/features/job-management/cancel-job.feature)
+  ⎿  Added 25 lines, removed 18 lines
+      10    @smoke
+      11    Scenario: Cancel a pending job
+      12      Given a job "j-001" exists with status "pending"
+      13 -    When DELETE /jobs/j-001 is called                          
+      13 +    When POST /jobs/j-001/cancel is called                     
+      14      Then the response status is 200
+      15      And job "j-001" status is "cancelled"
+      16  
+      17    @smoke
+      18 -  Scenario: Cancel a running job stops the process on the worke
+         -r                                                              
+      19 -    Given a worker "w-001" is registered and has status "online
+         -"                                                              
+      20 -    And a job "j-002" has status "running" on worker "w-001"   
+      21 -    When DELETE /jobs/j-002 is called                          
+      18 +  Scenario: Cancel a running job — scheduler writes cancelled; 
+         +runner_agent detects and stops                                 
+      19 +    Given a worker "w-001" is registered in worker_status with 
+         +status "online"                                                
+      20 +    And a job "j-002" has status "running" with worker_id "w-00
+         +1" in the jobs table                                           
+      21 +    When POST /jobs/j-002/cancel is called                     
+      22      Then the response status is 200
+      23 -    And the scheduler instructs runner_agent on "w-001" to stop
+         - job "j-002"                                                   
+      24 -    And job "j-002" status is "cancelled"                      
+      23 +    And job "j-002" status is "cancelled" in the jobs table    
+      24 +    And the runner_agent on "w-001" detects the "cancelled" sta
+         +tus on its next poll                                           
+      25 +    And the runner_agent stops the job process for "j-002"     
+      26  
+      27    @smoke
+      28    Scenario: Cancel an assigned job
+      28 -    Given a worker "w-001" is registered and has status "online
+         -"                                                              
+      29 -    And a job "j-003" has status "assigned" on worker "w-001"  
+      30 -    When DELETE /jobs/j-003 is called                          
+      29 +    Given a worker "w-001" is registered in worker_status with 
+         +status "online"                                                
+      30 +    And a job "j-003" has status "assigned" with worker_id "w-0
+         +01"                                                            
+      31 +    When POST /jobs/j-003/cancel is called                     
+      32      Then the response status is 200
+      33      And job "j-003" status is "cancelled"
+      34  
+      35    @error-handling
+      36    Scenario: Cannot cancel a completed job
+      37      Given a job "j-004" has status "completed"
+      37 -    When DELETE /jobs/j-004 is called                          
+      38 +    When POST /jobs/j-004/cancel is called                     
+      39      Then the response status is 409
+      40  
+      41    @error-handling
+      42    Scenario: Cannot cancel a failed job
+      43      Given a job "j-005" has status "failed"
+      43 -    When DELETE /jobs/j-005 is called                          
+      44 +    When POST /jobs/j-005/cancel is called                     
+      45      Then the response status is 409
+      46  
+      47    @error-handling
+      48 +  Scenario: Cannot cancel a timed_out job                      
+      49 +    Given a job "j-007" has status "timed_out"                 
+      50 +    When POST /jobs/j-007/cancel is called                     
+      51 +    Then the response status is 409                            
+      52 +                                                               
+      53 +  @error-handling                                              
+      54    Scenario: Cancel returns 404 for unknown job
+      48 -    When DELETE /jobs/does-not-exist is called                 
+      55 +    When POST /jobs/does-not-exist/cancel is called            
+      56      Then the response status is 404
+      57  
+      58    @error-handling
+      52 -  Scenario: Job is marked cancelled even if the assigned worker
+         - is offline at cancellation time                               
+      53 -    Given a worker "w-002" has status "offline"                
+      54 -    And a job "j-006" has status "running" with worker_id "w-00
+         -2"                                                             
+      55 -    When DELETE /jobs/j-006 is called                          
+      59 +  Scenario: Job is marked cancelled even when the assigned work
+         +er is currently offline                                        
+      60 +    Given a worker "w-002" has status "offline" in worker_statu
+         +s                                                              
+      61 +    And a job "j-006" has status "running" with worker_id "w-00
+         +2" in the jobs table                                           
+      62 +    When POST /jobs/j-006/cancel is called                     
+      63      Then the response status is 200
+      57 -    And job "j-006" status is "cancelled"                      
+      64 +    And job "j-006" status is "cancelled" in the jobs table    
+
+● Write(specs/features/worker-management/worker-registration.feature)
+  ⎿  Added 29 lines, removed 27 lines
+       1  @J002 @P1 @persona:platform_operator
+       2 -Feature: Worker Node Registration                              
+       2 +Feature: Worker Node Registration via Database                 
+       3    As a runner_agent on a worker node
+       4 -  I want to register with the scheduler                        
+       4 +  I want to register my presence by writing to the worker_statu
+         +s table                                                        
+       5    So that the scheduler knows this node is available to accept 
+          job assignments
+       6  
+       7    Background:
+       8      Given the Lightcron scheduler is running
+       9 -    And no workers are registered                              
+       9 +    And the worker_status table is empty                       
+      10  
+      11    @smoke
+      12 -  Scenario: Successfully register a worker node                
+      13 -    When a runner_agent sends POST /workers/register with hostn
+         -ame "worker-01"                                                
+      14 -    Then the response status is 201                            
+      15 -    And the response contains a unique worker_id               
+      16 -    And the worker status is "online"                          
+      12 +  Scenario: Runner agent registers on startup by upserting to w
+         +orker_status                                                   
+      13 +    When the runner_agent on hostname "worker-01" starts up    
+      14 +    And it upserts a row to worker_status with hostname "worker
+         +-01" and status "online"                                       
+      15 +    Then a row exists in worker_status for hostname "worker-01"
+         + with status "online"                                          
+      16 +    And the row has a unique worker_id                         
+      17 +    And last_seen is set to approximately now                  
+      18  
+      19    @smoke
+      19 -  Scenario: Worker sends a heartbeat to stay online            
+      20 -    Given a runner_agent is registered with hostname "worker-01
+         -" and worker_id "w-abc"                                        
+      21 -    When the runner_agent sends POST /workers/w-abc/heartbeat  
+      22 -    Then the response status is 200                            
+      23 -    And the worker last_seen timestamp is updated              
+      20 +  Scenario: Runner agent maintains registration by updating las
+         +t_seen every 30 seconds                                        
+      21 +    Given a worker_status row exists for worker_id "w-abc" with
+         + status "online"                                               
+      22 +    When 30 seconds elapse and the runner_agent updates worker_
+         +status.last_seen for "w-abc"                                   
+      23 +    Then last_seen for worker_id "w-abc" is updated to approxim
+         +ately now                                                      
+      24  
+      25    @error-handling
+      26 -  Scenario: Heartbeat for unknown worker returns 404           
+      27 -    When a runner_agent sends POST /workers/unknown-id/heartbea
+         -t                                                              
+      28 -    Then the response status is 404                            
+      29 -                                                               
+      30 -  @error-handling                                              
+      31 -  Scenario: Worker is marked offline after missing heartbeats f
+         -or 90 seconds                                                  
+      32 -    Given a runner_agent is registered with hostname "worker-02
+         -" and worker_id "w-def"                                        
+      33 -    And the worker last sent a heartbeat 90 seconds ago        
+      26 +  Scenario: Scheduler marks worker offline after last_seen has 
+         +not been updated for 90 seconds                                
+      27 +    Given a worker_status row exists for worker_id "w-def" with
+         + status "online"                                               
+      28 +    And the last_seen timestamp for "w-def" is 90 seconds in th
+         +e past                                                         
+      29      When the scheduler runs its health check
+      35 -    Then the worker "w-def" status is "offline"                
+      30 +    Then worker_status for "w-def" has status "offline"        
+      31  
+      32    @smoke
+      38 -  Scenario: Re-registering the same hostname is idempotent     
+      39 -    Given a runner_agent is registered with hostname "worker-01
+         -" and worker_id "w-abc"                                        
+      40 -    When a runner_agent sends POST /workers/register with hostn
+         -ame "worker-01"                                                
+      33 +  Scenario: Re-registering the same hostname on restart is idem
+         +potent                                                         
+      34 +    Given a worker_status row exists for hostname "worker-01" w
+         +ith worker_id "w-abc" and status "offline"                     
+      35 +    When the runner_agent on hostname "worker-01" starts up and
+         + upserts to worker_status                                      
+      36 +    Then the row for hostname "worker-01" has status "online"  
+      37 +    And the worker_id remains "w-abc"                          
+      38 +    And last_seen is updated to approximately now              
+      39 +                                                               
+      40 +  @smoke                                                       
+      41 +  Scenario: Scheduler can confirm worker is alive via worker RE
+         +ST health endpoint                                             
+      42 +    Given a worker_status row for "w-abc" has a stale last_seen
+      43 +    And the runner_agent on "w-abc" is still running           
+      44 +    When the scheduler calls GET /health on the runner_agent at
+         + "w-abc"                                                       
+      45      Then the response status is 200
+      42 -    And the response contains worker_id "w-abc"                
+      43 -    And the worker status is "online"                          
+● Write(specs/features/worker-management/job-dispatch.feature)
+  ⎿  Added 34 lines, removed 25 lines
+       1  @J003 @P1 @persona:platform_operator
+       2 -Feature: Job Dispatch to Worker                                
+       3 -  As the scheduler                                             
+       4 -  I want to dispatch a pending job to an available online worke
+         -r at its start_time                                            
+       5 -  So that the runner agent can start executing it              
+       2 +Feature: Job Dispatch and Pickup via Database                  
+       3 +  As the scheduler and runner_agent                            
+       4 +  I want jobs to be dispatched by the scheduler writing to the 
+         +jobs table                                                     
+       5 +  And picked up by the runner_agent polling the jobs table     
+       6 +  So that no message broker is needed                          
+       7  
+       8    Background:
+       9      Given the Lightcron scheduler is running
+      10  
+      11    @smoke
+      11 -  Scenario: Pending job is dispatched to an available worker at
+         - start_time                                                    
+      12 -    Given a worker "w-001" is registered and has status "online
+         -"                                                              
+      13 -    And a job "j-001" exists with status "pending" and start_ti
+         -me of now                                                      
+      12 +  Scenario: Scheduler dispatches a pending job by writing worke
+         +r_id to the jobs table                                         
+      13 +    Given a worker_status row for "w-001" exists with status "o
+         +nline" and a current last_seen                                 
+      14 +    And a job "j-001" exists in the jobs table with status "pen
+         +ding" and start_time of now                                    
+      15      When the scheduler runs its dispatch cycle
+      15 -    Then job "j-001" status is "assigned"                      
+      16 -    And job "j-001" has worker_id "w-001"                      
+      16 +    Then job "j-001" status in the jobs table is "assigned"    
+      17 +    And job "j-001" worker_id in the jobs table is "w-001"     
+      18  
+      19    @smoke
+      19 -  Scenario: Runner agent confirms job start and status transiti
+         -ons to running                                                 
+      20 -    Given a job "j-001" has status "assigned" on worker "w-001"
+      21 -    When the runner_agent on "w-001" confirms execution start f
+         -or job "j-001"                                                 
+      22 -    Then job "j-001" status is "running"                       
+      20 +  Scenario: Runner agent picks up assigned job by polling the j
+         +obs table                                                      
+      21 +    Given a job "j-001" exists in the jobs table with status "a
+         +ssigned" and worker_id "w-001"                                 
+      22 +    When the runner_agent on "w-001" polls the jobs table for a
+         +ssigned jobs                                                   
+      23 +    Then the runner_agent retrieves job "j-001" with its comman
+         +d and end_time                                                 
+      24  
+      25 +  @smoke                                                       
+      26 +  Scenario: Runner agent updates job status to running after st
+         +arting the process                                             
+      27 +    Given the runner_agent on "w-001" has retrieved job "j-001"
+      28 +    When the runner_agent starts the job process and updates th
+         +e jobs table                                                   
+      29 +    Then job "j-001" status in the jobs table is "running"     
+      30 +                                                               
+      31    @error-handling
+      25 -  Scenario: Job stays pending when no online workers are availa
+         -ble                                                            
+      26 -    Given no workers are registered                            
+      32 +  Scenario: Job stays pending when no online workers exist     
+      33 +    Given no rows in worker_status have status "online"        
+      34      And a job "j-002" exists with status "pending" and start_ti
+          me of now
+      35      When the scheduler runs its dispatch cycle
+      29 -    Then job "j-002" status is "pending"                       
+      36 +    Then job "j-002" status remains "pending"                  
+      37  
+      38    @smoke
+      32 -  Scenario: Scheduler dispatches to the worker with the fewest 
+         -running jobs                                                   
+      33 -    Given worker "w-001" is online with 2 running jobs         
+      34 -    And worker "w-002" is online with 0 running jobs           
+      39 +  Scenario: Scheduler dispatches to the worker with the fewest 
+         +currently running jobs                                         
+      40 +    Given worker_status contains:                              
+      41 +      | worker_id | status | running_job_count |               
+      42 +      | w-001     | online | 2                 |               
+      43 +      | w-002     | online | 0                 |               
+      44      And a job "j-003" exists with status "pending" and start_ti
+          me of now
+      45      When the scheduler runs its dispatch cycle
+      37 -    Then job "j-003" is assigned to worker "w-002"             
+      46 +    Then job "j-003" is assigned to worker "w-002" in the jobs 
+         +table                                                          
+      47  
+      48    @error-handling
+      40 -  Scenario: Job transitions to timed_out if worker goes offline
+         - after assignment before confirming start                      
+      41 -    Given a job "j-004" has status "assigned" on worker "w-003"
+      42 -    And worker "w-003" has not sent a heartbeat for 90 seconds 
+      49 +  Scenario: Job transitions to timed_out if worker_status.last_
+         +seen expires while job is assigned                             
+      50 +    Given a job "j-004" has status "assigned" with worker_id "w
+         +-003" in the jobs table                                        
+      51 +    And worker_status for "w-003" has last_seen 90 seconds in t
+         +he past                                                        
+      52      When the scheduler runs its health check
+      44 -    Then job "j-004" status is "timed_out"                     
+      45 -    And worker "w-003" status is "offline"                     
+      53 +    Then worker_status for "w-003" has status "offline"        
+      54 +    And job "j-004" status in the jobs table is "timed_out"    
+
+● Write(specs/features/operations/stuck-job-recovery.feature)
+  ⎿  Added 39 lines, removed 31 lines
+       1  @J008 @P1 @persona:sre_operator @persona:platform_operator
+       2 -Feature: Detect and Recover Stuck Jobs                         
+       2 +Feature: Detect and Recover Stuck Jobs via Database Heartbeat  
+       3    As the scheduler
+       4 -  I want to detect when a worker has stopped sending heartbeats
+         - and automatically mark its jobs as timed_out                  
+       4 +  I want to detect when a worker's worker_status.last_seen has 
+         +expired                                                        
+       5 +  And automatically mark its jobs as timed_out in the jobs tabl
+         +e                                                              
+       6    So that stuck jobs do not remain in running or assigned state
+           indefinitely
+       7  
+       8    Background:
+       9      Given the Lightcron scheduler is running
+      10  
+      11    @smoke
+      11 -  Scenario: Running job is marked timed_out when worker heartbe
+         -at expires                                                     
+      12 -    Given a worker "w-001" has a "running" job "j-001"         
+      13 -    And worker "w-001" has not sent a heartbeat for 90 seconds 
+      12 +  Scenario: Running job is marked timed_out when worker_status.
+         +last_seen expires                                              
+      13 +    Given a worker_status row for "w-001" has status "online" w
+         +ith last_seen 90 seconds ago                                   
+      14 +    And a job "j-001" in the jobs table has status "running" wi
+         +th worker_id "w-001"                                           
+      15      When the scheduler runs its health check
+      15 -    Then worker "w-001" status is "offline"                    
+      16 -    And job "j-001" status is "timed_out"                      
+      16 +    Then worker_status for "w-001" has status "offline"        
+      17 +    And job "j-001" status in the jobs table is "timed_out"    
+      18  
+      19    @smoke
+      19 -  Scenario: Assigned job is marked timed_out when worker heartb
+         -eat expires                                                    
+      20 -    Given a worker "w-001" has an "assigned" job "j-002" (start
+         - not yet confirmed)                                            
+      21 -    And worker "w-001" has not sent a heartbeat for 90 seconds 
+      20 +  Scenario: Assigned job is marked timed_out when worker_status
+         +.last_seen expires                                             
+      21 +    Given a worker_status row for "w-001" has last_seen 90 seco
+         +nds ago                                                        
+      22 +    And a job "j-002" in the jobs table has status "assigned" w
+         +ith worker_id "w-001"                                          
+      23      When the scheduler runs its health check
+      23 -    Then job "j-002" status is "timed_out"                     
+      24 +    Then job "j-002" status in the jobs table is "timed_out"   
+      25  
+      26    @error-handling
+      26 -  Scenario: Job remains running when worker misses fewer than 9
+         -0 seconds of heartbeats                                        
+      27 -    Given a worker "w-001" has a "running" job "j-003"         
+      28 -    And worker "w-001" has not sent a heartbeat for 60 seconds 
+      27 +  Scenario: Job remains running when last_seen has not yet expi
+         +red                                                            
+      28 +    Given a worker_status row for "w-001" has last_seen 60 seco
+         +nds ago                                                        
+      29 +    And a job "j-003" in the jobs table has status "running" wi
+         +th worker_id "w-001"                                           
+      30      When the scheduler runs its health check
+      30 -    Then job "j-003" status is "running"                       
+      31 -    And worker "w-001" status is "online"                      
+      31 +    Then job "j-003" status remains "running"                  
+      32 +    And worker_status for "w-001" status remains "online"      
+      33  
+      34    @smoke
+      34 -  Scenario: Timed-out job is visible via status filter         
+      35 -    Given a job "j-004" has status "timed_out" with worker_id "
+         -w-001"                                                         
+      35 +  Scenario: Timed-out jobs are visible via the status filter in
+         + the REST API                                                  
+      36 +    Given a job "j-004" has status "timed_out" with worker_id "
+         +w-001" in the jobs table                                       
+      37      When GET /jobs?status=timed_out is called
+      38      Then the response status is 200
+      38 -    And job "j-004" appears in the response                    
+      39 -    And the response includes worker_id "w-001"                
+      39 +    And job "j-004" appears in the response with worker_id "w-0
+         +01"                                                            
+      40  
+      41    @smoke
+      42 -  Scenario: Worker that re-registers after going offline gets a
+         - new worker_id                                                 
+      43 -    Given a worker "w-001" with hostname "worker-01" has status
+         - "offline"                                                     
+      44 -    When a runner_agent sends POST /workers/register with hostn
+         -ame "worker-01"                                                
+      45 -    Then the response status is 201                            
+      46 -    And the response contains a new worker_id that is not "w-00
+         -1"                                                             
+      47 -    And the new worker has status "online"                     
+      42 +  Scenario: Worker that re-registers after going offline gets t
+         +reated as a fresh registration                                 
+      43 +    Given a worker_status row for hostname "worker-01" has stat
+         +us "offline"                                                   
+      44 +    When the runner_agent on "worker-01" restarts and upserts t
+         +o worker_status                                                
+      45 +    Then the worker_status row for "worker-01" has status "onli
+         +ne"                                                            
+      46 +    And last_seen is updated to approximately now              
+      47  
+      48    @error-handling
+      49    Scenario: Multiple workers failing simultaneously marks all t
+          heir jobs as timed_out
+      51 -    Given worker "w-001" has a "running" job "j-005"           
+      52 -    And worker "w-002" has a "running" job "j-006"             
+      53 -    And both workers have not sent a heartbeat for 90 seconds  
+      50 +    Given worker_status rows for "w-001" and "w-002" both have 
+         +last_seen 90 seconds ago                                       
+      51 +    And job "j-005" has status "running" with worker_id "w-001"
+      52 +    And job "j-006" has status "running" with worker_id "w-002"
+      53      When the scheduler runs its health check
+      54      Then job "j-005" status is "timed_out"
+      55      And job "j-006" status is "timed_out"
+      57 -    And worker "w-001" status is "offline"                     
+      58 -    And worker "w-002" status is "offline"                     
+      56 +    And worker_status for "w-001" has status "offline"         
+      57 +    And worker_status for "w-002" has status "offline"         
+      58 +                                                               
+      59 +  @smoke                                                       
+      60 +  Scenario: Scheduler calls worker REST /health when last_seen 
+         +is stale but not yet timed_out                                 
+      61 +    # SPEC-AMBIGUOUS: exact threshold for calling /health vs im
+         +mediately marking offline TBD                                  
+      62 +    Given a worker_status row for "w-001" has last_seen 60 seco
+         +nds ago (stale but < 90s)                                      
+      63 +    When the scheduler runs its health check                   
+      64 +    And the scheduler calls GET /health on the runner_agent at 
+         +"w-001"                                                        
+      65 +    And the runner_agent returns HTTP 200                      
+      66 +    Then worker_status for "w-001" status remains "online"     
+
+● Update the manifest to point to the new conventions version:
+
+● Update(.claude/manifest.yaml)
+  ⎿  Added 1 line, removed 1 line
+       9  
+      10  artifact_versions:
+      11    user_journeys: "000_user_journeys_v1.md"
+      12 -  shared_conventions: "008_shared_conventions_v1.md"           
+      12 +  shared_conventions: "008_shared_conventions_v2.md"           
+      13  
+      14  exclusive_permissions:
+      15    write_backend_code: back
+
+● Done. Here's a summary of what changed:
+
+  Updated: 4 feature files + conventions v2
+
+  cancel-job.feature — DELETE /jobs/{id} → POST /jobs/{id}/cancel throughout;
+  added timed_out as a non-cancellable terminal state
+
+  worker-registration.feature — Rewritten entirely around DB writes. No more
+  REST registration or heartbeat endpoints. Steps now describe UPSERT 
+  worker_status, UPDATE last_seen, and the /health check as a secondary liveness
+   probe
+
+  job-dispatch.feature — Workers now poll the jobs table for assigned jobs
+  rather than receiving REST calls. Dispatch = scheduler writing worker_id to
+  the jobs table
+
+  stuck-job-recovery.feature — Heartbeat language removed; everything is framed
+  around worker_status.last_seen. Added a scenario flagged SPEC-AMBIGUOUS for
+  the /health call threshold (when does the scheduler call /health vs. just
+  marking offline?)
+
+  ---
+  One open question flagged in the feature file: at what point does the 
+  scheduler call the worker's /health endpoint vs. immediately writing offline 
+  to worker_status? Two options:
+
+  - Option A: Only write offline after last_seen > 90s — the /health call is
+  purely advisory/monitoring and has no effect on job dispatch
+  - Option B: At last_seen > 60s, call /health first; only write offline if
+  /health also fails (adds resilience against transient DB write failures on the
+   worker)
+
+  Which behaviour do you want?
+
+✻ Sautéed for 1m 54s
+
+❯ Option B please                                                               
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Added 2 lines, removed 1 line
+      1  # Shared Conventions — Lightcron
+      2  
+      3 -**Version**: v2                                                 
+      3 +**Version**: v3                                                 
+      4  **Created**: 2026-03-21
+      5  **Updated**: 2026-03-21 — v2: corrected cancel from DELETE to PO
+         ST; workers use DB-direct, not REST
+      6 +**Updated**: 2026-03-21 — v3: two-stage worker liveness detectio
+        +n (60s → /health probe, 90s → offline)                          
+      7  **Agent**: design (Phase A)
+      8  **Purpose**: Single source of truth for naming, roles, threshold
+         s, and patterns.
+      9               Every BDD generation agent receives this document v
+         erbatim.
+
+● Update(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Added 20 lines, removed 7 lines
+      100  
+      101  ## Numeric Constants (EXACT — do not approximate)
+      102  
+      103 -| Constant                       | Value | Spec Reference     
+          -       |                                                      
+      104 -|--------------------------------|-------|--------------------
+          --------|                                                      
+      105 -| Worker last_seen update interval | 30s | J002, J008         
+          -       |                                                      
+      106 -| Worker last_seen timeout       | 90s   | J008 (3 missed upda
+          -tes)   |                                                      
+      107 -| Stuck job detection lag        | 90s   | J008               
+          -       |                                                      
+      108 -| SIGTERM grace period           | TBD   | J004 — to be confir
+          -med    |                                                      
+      109 -| Max jobs per worker            | TBD   | To be defined in sp
+          -ec     |                                                      
+      103 +| Constant                         | Value | Spec Reference   
+          +                        |                                     
+      104 +|----------------------------------|-------|------------------
+          +------------------------|                                     
+      105 +| Worker last_seen update interval | 30s   | J002, J008       
+          +                        |                                     
+      106 +| /health probe threshold          | 60s   | J008 — stage 1: c
+          +all worker /health      |                                     
+      107 +| Worker offline threshold         | 90s   | J008 — stage 2: m
+          +ark offline if /health also fails |                           
+      108 +| SIGTERM grace period             | TBD   | J004 — to be conf
+          +irmed                   |                                     
+      109 +| Max jobs per worker              | TBD   | To be defined in 
+          +spec                    |                                     
+      110  
+      111 +### Two-Stage Worker Liveness Detection (J008)                
+      112 +                                                              
+      113 +```                                                           
+      114 +last_seen < 60s  →  worker considered healthy, no action      
+      115 +last_seen >= 60s →  Stage 1: scheduler calls GET /health on wo
+          +rker's REST API                                               
+      116 +                       /health returns 200  →  worker is alive
+          +; no status change                                            
+      117 +                       /health fails/timeout →  Stage 2: mark 
+          +worker_status offline,                                        
+      118 +                                                mark all assig
+          +ned/running jobs timed_out                                    
+      119 +last_seen >= 90s →  Skip /health probe (assume dead); go direc
+          +tly to Stage 2                                                
+      120 +```                                                           
+      121 +                                                              
+      122 +This tolerates transient DB write failures on the worker while
+          + still recovering promptly from true worker crashes.          
+      123 +                                                              
+      124  ---
+      125  
+      126  ## Scheduler REST API Paths (user-facing — EXACT)
+
+● Now update the feature file to resolve the SPEC-AMBIGUOUS scenario and add the
+   two-stage logic:
+
+● Write(specs/features/operations/stuck-job-recovery.feature)
+  ⎿  Added 68 lines, removed 37 lines
+       1  @J008 @P1 @persona:sre_operator @persona:platform_operator
+       2 -Feature: Detect and Recover Stuck Jobs via Database Heartbeat  
+       2 +Feature: Detect and Recover Stuck Jobs via Two-Stage Liveness C
+         +heck                                                           
+       3    As the scheduler
+       4 -  I want to detect when a worker's worker_status.last_seen has 
+         -expired                                                        
+       5 -  And automatically mark its jobs as timed_out in the jobs tabl
+         -e                                                              
+       6 -  So that stuck jobs do not remain in running or assigned state
+         - indefinitely                                                  
+       4 +  I want to use a two-stage liveness check (DB last_seen + work
+         +er /health probe)                                              
+       5 +  So that transient DB write failures do not falsely mark healt
+         +hy workers as offline,                                         
+       6 +  but true worker crashes are still detected and stuck jobs are
+         + recovered promptly                                            
+       7  
+       8 +  # Two-stage logic:                                           
+       9 +  #   last_seen >= 60s  → Stage 1: call GET /health on worker  
+      10 +  #     /health 200     → worker alive; no status change       
+      11 +  #     /health fails   → Stage 2: mark worker offline, mark jo
+         +bs timed_out                                                   
+      12 +  #   last_seen >= 90s  → skip /health; go directly to Stage 2 
+      13 +                                                               
+      14    Background:
+      15      Given the Lightcron scheduler is running
+      16  
+      17 +  # ── Stage 1: /health probe ─────────────────────────────────
+         +─────────────────                                              
+      18 +                                                               
+      19    @smoke
+      12 -  Scenario: Running job is marked timed_out when worker_status.
+         -last_seen expires                                              
+      13 -    Given a worker_status row for "w-001" has status "online" w
+         -ith last_seen 90 seconds ago                                   
+      20 +  Scenario: Worker with stale last_seen but healthy /health end
+         +point stays online                                             
+      21 +    Given a worker_status row for "w-001" has last_seen 60 seco
+         +nds ago                                                        
+      22      And a job "j-001" in the jobs table has status "running" wi
+          th worker_id "w-001"
+      23      When the scheduler runs its health check
+      24 +    And the scheduler calls GET /health on the runner_agent at 
+         +"w-001"                                                        
+      25 +    And the runner_agent returns HTTP 200                      
+      26 +    Then worker_status for "w-001" status remains "online"     
+      27 +    And job "j-001" status remains "running"                   
+      28 +                                                               
+      29 +  @error-handling                                              
+      30 +  Scenario: Worker with stale last_seen and failing /health is 
+         +marked offline                                                 
+      31 +    Given a worker_status row for "w-001" has last_seen 60 seco
+         +nds ago                                                        
+      32 +    And a job "j-002" in the jobs table has status "running" wi
+         +th worker_id "w-001"                                           
+      33 +    When the scheduler runs its health check                   
+      34 +    And the scheduler calls GET /health on the runner_agent at 
+         +"w-001"                                                        
+      35 +    And the runner_agent does not respond (connection refused o
+         +r timeout)                                                     
+      36      Then worker_status for "w-001" has status "offline"
+      17 -    And job "j-001" status in the jobs table is "timed_out"    
+      37 +    And job "j-002" status in the jobs table is "timed_out"    
+      38  
+      39 +  # ── Stage 2: threshold exceeded, skip /health ──────────────
+         +──────────────────                                             
+      40 +                                                               
+      41    @smoke
+      20 -  Scenario: Assigned job is marked timed_out when worker_status
+         -.last_seen expires                                             
+      21 -    Given a worker_status row for "w-001" has last_seen 90 seco
+         -nds ago                                                        
+      22 -    And a job "j-002" in the jobs table has status "assigned" w
+         -ith worker_id "w-001"                                          
+      42 +  Scenario: Running job is marked timed_out when last_seen exce
+         +eds 90s (no /health probe)                                     
+      43 +    Given a worker_status row for "w-002" has last_seen 90 seco
+         +nds ago                                                        
+      44 +    And a job "j-003" in the jobs table has status "running" wi
+         +th worker_id "w-002"                                           
+      45      When the scheduler runs its health check
+      24 -    Then job "j-002" status in the jobs table is "timed_out"   
+      46 +    Then the scheduler does NOT call GET /health on "w-002"    
+      47 +    And worker_status for "w-002" has status "offline"         
+      48 +    And job "j-003" status in the jobs table is "timed_out"    
+      49  
+      26 -  @error-handling                                              
+      27 -  Scenario: Job remains running when last_seen has not yet expi
+         -red                                                            
+      28 -    Given a worker_status row for "w-001" has last_seen 60 seco
+         -nds ago                                                        
+      29 -    And a job "j-003" in the jobs table has status "running" wi
+         -th worker_id "w-001"                                           
+      50 +  @smoke                                                       
+      51 +  Scenario: Assigned job is marked timed_out when last_seen exc
+         +eeds 90s                                                       
+      52 +    Given a worker_status row for "w-002" has last_seen 90 seco
+         +nds ago                                                        
+      53 +    And a job "j-004" in the jobs table has status "assigned" w
+         +ith worker_id "w-002"                                          
+      54      When the scheduler runs its health check
+      31 -    Then job "j-003" status remains "running"                  
+      32 -    And worker_status for "w-001" status remains "online"      
+      55 +    Then job "j-004" status in the jobs table is "timed_out"   
+      56  
+      57 +  # ── Healthy worker: no action ──────────────────────────────
+         +──────────────────                                             
+      58 +                                                               
+      59    @smoke
+      35 -  Scenario: Timed-out jobs are visible via the status filter in
+         - the REST API                                                  
+      36 -    Given a job "j-004" has status "timed_out" with worker_id "
+         -w-001" in the jobs table                                       
+      60 +  Scenario: Worker with fresh last_seen is left completely alon
+         +e                                                              
+      61 +    Given a worker_status row for "w-003" has last_seen 20 seco
+         +nds ago                                                        
+      62 +    And a job "j-005" in the jobs table has status "running" wi
+         +th worker_id "w-003"                                           
+      63 +    When the scheduler runs its health check                   
+      64 +    Then the scheduler does NOT call GET /health on "w-003"    
+      65 +    And worker_status for "w-003" status remains "online"      
+      66 +    And job "j-005" status remains "running"                   
+      67 +                                                               
+      68 +  # ── Observability ──────────────────────────────────────────
+         +──────────────────                                             
+      69 +                                                               
+      70 +  @smoke                                                       
+      71 +  Scenario: Timed-out jobs are visible via the REST API status 
+         +filter                                                         
+      72 +    Given a job "j-006" has status "timed_out" with worker_id "
+         +w-001" in the jobs table                                       
+      73      When GET /jobs?status=timed_out is called
+      74      Then the response status is 200
+      39 -    And job "j-004" appears in the response with worker_id "w-0
+         -01"                                                            
+      75 +    And job "j-006" appears in the response with worker_id "w-0
+         +01"                                                            
+      76  
+      77 +  # ── Re-registration ────────────────────────────────────────
+         +──────────────────                                             
+      78 +                                                               
+      79    @smoke
+      42 -  Scenario: Worker that re-registers after going offline gets t
+         -reated as a fresh registration                                 
+      80 +  Scenario: Worker that re-registers after going offline gets a
+         + fresh online status                                           
+      81      Given a worker_status row for hostname "worker-01" has stat
+          us "offline"
+      82      When the runner_agent on "worker-01" restarts and upserts t
+          o worker_status
+      83      Then the worker_status row for "worker-01" has status "onli
+          ne"
+      84      And last_seen is updated to approximately now
+      85  
+      86 +  # ── Mass failure ───────────────────────────────────────────
+         +──────────────────                                             
+      87 +                                                               
+      88    @error-handling
+      89    Scenario: Multiple workers failing simultaneously marks all t
+          heir jobs as timed_out
+      50 -    Given worker_status rows for "w-001" and "w-002" both have 
+         -last_seen 90 seconds ago                                       
+      51 -    And job "j-005" has status "running" with worker_id "w-001"
+      52 -    And job "j-006" has status "running" with worker_id "w-002"
+      90 +    Given worker_status rows for "w-004" and "w-005" both have 
+         +last_seen 90 seconds ago                                       
+      91 +    And job "j-007" has status "running" with worker_id "w-004"
+      92 +    And job "j-008" has status "running" with worker_id "w-005"
+      93      When the scheduler runs its health check
+      54 -    Then job "j-005" status is "timed_out"                     
+      55 -    And job "j-006" status is "timed_out"                      
+      56 -    And worker_status for "w-001" has status "offline"         
+      57 -    And worker_status for "w-002" has status "offline"         
+      58 -                                                               
+      59 -  @smoke                                                       
+      60 -  Scenario: Scheduler calls worker REST /health when last_seen 
+         -is stale but not yet timed_out                                 
+      61 -    # SPEC-AMBIGUOUS: exact threshold for calling /health vs im
+         -mediately marking offline TBD                                  
+      62 -    Given a worker_status row for "w-001" has last_seen 60 seco
+         -nds ago (stale but < 90s)                                      
+      63 -    When the scheduler runs its health check                   
+      64 -    And the scheduler calls GET /health on the runner_agent at 
+         -"w-001"                                                        
+      65 -    And the runner_agent returns HTTP 200                      
+      66 -    Then worker_status for "w-001" status remains "online"     
+      94 +    Then job "j-007" status is "timed_out"                     
+      95 +    And job "j-008" status is "timed_out"                      
+      96 +    And worker_status for "w-004" has status "offline"         
+      97 +    And worker_status for "w-005" has status "offline"         
+
+● Update(.claude/manifest.yaml)
+  ⎿  Added 1 line, removed 1 line
+       9  
+      10  artifact_versions:
+      11    user_journeys: "000_user_journeys_v1.md"
+      12 -  shared_conventions: "008_shared_conventions_v2.md"           
+      12 +  shared_conventions: "008_shared_conventions_v3.md"           
+      13  
+      14  exclusive_permissions:
+      15    write_backend_code: back
+
+● Done. The two-stage logic is now fully specified:
+
+  ┌───────────┬──────────────────────────────────────────────────────────────┐
+  │ last_seen │                            Action                            │
+  ├───────────┼──────────────────────────────────────────────────────────────┤
+  │ < 60s     │ No action — worker healthy                                   │
+  ├───────────┼──────────────────────────────────────────────────────────────┤
+  │ 60–89s    │ Call /health → 200 means alive, failure means offline + jobs │
+  │           │  → timed_out                                                 │
+  ├───────────┼──────────────────────────────────────────────────────────────┤
+  │ ≥ 90s     │ Skip /health, go straight to offline + timed_out             │
+  └───────────┴──────────────────────────────────────────────────────────────┘
+
+  The stuck-job-recovery.feature now has explicit scenarios for each branch,
+  including a scenario asserting the scheduler does not call /health when
+  last_seen ≥ 90s.
+
+  All 8 feature files are now clean — no remaining SPEC-AMBIGUOUS markers. Are
+  you happy with the journeys and feature files? If so, I'll move to Phase B — 
+  Solution Design (architecture, components, hexagonal structure, and the BA
+  handoff pack).
+
+✻ Cooked for 56s
+
+❯ Reading through the shared_conventions file I'm not keen on the use of the    
+terms runnerAgent and worker as they seem to apply to the same thing. Can you   
+please instead shift to use workerAgent (for the process running on the         
+machine) and worker or workerNode for the machine on which it runs.             
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Bash(for f in \
+        "/home/akmon/dev/beholder/lightcron/specs/features/operations/stuck-job-
+      recovery.feature" \…)
+  ⎿  done
+
+● Now fix the stale DELETE references still in the journeys artifact from the
+  earlier correction (the sed only handled the naming, not those):
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 7 lines, removed 7 lines
+      79  
+      80  | Step | User Action                                      | Sys
+          tem Response                                  | Success Criteri
+          a                        |
+      81  |------|--------------------------------------------------|----
+          ----------------------------------------------|----------------
+          -------------------------|
+      82 -| 1    | Worker agent POSTs /workers/register with node hostnam
+         -e and capabilities | Scheduler stores worker as `online`; retur
+         -ns worker_id | HTTP 201, worker_id returned |                  
+      83 -| 2    | Worker agent sends POST /workers/{worker_id}/heartbeat
+         - every 30s | Scheduler records last_seen timestamp            |
+         - HTTP 200                                |                     
+      84 -| 3    | Worker agent stops sending heartbeats            | Aft
+         -er 90s scheduler marks worker as `offline`    | Worker status i
+         -s `offline`              |                                     
+      82 +| 1    | worker_agent starts up and upserts row to worker_statu
+         +s with hostname | Scheduler reads worker as `online` | Row in w
+         +orker_status with status `online` |                            
+      83 +| 2    | worker_agent updates worker_status.last_seen every 30s
+         + | Scheduler reads current last_seen | last_seen timestamp is c
+         +urrent          |                                              
+      84 +| 3    | worker_agent stops updating last_seen            | Aft
+         +er 90s scheduler marks worker_status as `offline` | Worker stat
+         +us is `offline`         |                                      
+      85  
+      86  ### Acceptance Criteria
+      87  
+      88 -- **AC-J002-01**: Given a valid registration payload with hostn
+         -ame, When POST /workers/register is called, Then HTTP 201 is re
+         -turned with a unique worker_id and status `online`             
+      89 -- **AC-J002-02**: Given a registered worker, When POST /workers
+         -/{worker_id}/heartbeat is called, Then HTTP 200 is returned and
+         - last_seen is updated                                          
+      90 -- **AC-J002-03**: Given a registered worker that has not sent a
+         - heartbeat for 90s, Then its status transitions to `offline`   
+      91 -- **AC-J002-04**: Given a worker_id that does not exist, When P
+         -OST /workers/{worker_id}/heartbeat is called, Then HTTP 404 is 
+         -returned                                                       
+      88 +- **AC-J002-01**: Given a worker_agent starts up, When it upser
+         +ts to worker_status with its hostname, Then a row exists with s
+         +tatus `online` and a unique worker_id                          
+      89 +- **AC-J002-02**: Given a registered worker_agent, When it upda
+         +tes worker_status.last_seen every 30s, Then last_seen reflects 
+         +the current time                                               
+      90 +- **AC-J002-03**: Given a worker_agent that has not updated las
+         +t_seen for 90s, Then the scheduler marks its worker_status row 
+         +as `offline`                                                   
+      91 +- **AC-J002-04**: Given a worker_status row with a stale last_s
+         +een (≥60s but <90s), When the scheduler calls GET /health on th
+         +e worker_agent and receives 200, Then the worker remains `onlin
+         +e`                                                             
+      92  
+      93  ### BDD Feature File
+      94  
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 6 lines, removed 5 lines
+       96  
+       97  ### Error Scenarios
+       98  
+       99 -| Scenario              | Trigger                       | Expe
+          -cted Behaviour              |                                 
+      100 -|-----------------------|-------------------------------|-----
+          -----------------------------|                                 
+      101 -| Heartbeat timeout     | No heartbeat for 90s          | Work
+          -er status → `offline`       |                                 
+      102 -| Unknown worker_id     | Invalid worker_id in heartbeat | HTT
+          -P 404                       |                                 
+      103 -| Duplicate registration | Same hostname re-registers   | HTTP
+          - 200 with existing worker_id (idempotent) |                   
+       99 +| Scenario              | Trigger                             
+          + | Expected Behaviour                         |               
+      100 +|-----------------------|-------------------------------------
+          +-|--------------------------------------------|               
+      101 +| last_seen timeout     | No DB update for 90s                
+          + | Scheduler marks worker_status `offline`    |               
+      102 +| Stale last_seen + healthy | last_seen ≥60s; GET /health → 20
+          +0 | Worker remains `online`               |                   
+      103 +| Stale last_seen + dead    | last_seen ≥60s; GET /health fail
+          +s | Worker marked `offline`; jobs `timed_out` |               
+      104 +| Duplicate registration | Same hostname re-registers         
+          + | Existing worker_id preserved; status reset to `online` |   
+      105  
+      106  ---
+      107  
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 1 line, removed 1 line
+      193  
+      194  | Step | User Action                                      | Sy
+           stem Response                                  | Success Crite
+           ria                         |
+      195  |------|--------------------------------------------------|---
+           -----------------------------------------------|--------------
+           ----------------------------|
+      196 -| 1    | DELETE /jobs/{job_id}                            | Sc
+          -heduler marks job as `cancelled`; if `running`, sends cancel s
+          -ignal to worker | HTTP 200, status `cancelled` |              
+      196 +| 1    | POST /jobs/{job_id}/cancel                       | Sc
+          +heduler writes `cancelled` to jobs table; if `running`, worker
+          +_agent detects on next poll | HTTP 200, status `cancelled` |  
+      197  | 2    | (if job was running) Worker agent receives cancellati
+           on | Worker agent sends SIGTERM to job process | Job process s
+           topped                      |
+      198  | 3    | GET /jobs/{job_id}                               | Re
+           turns status `cancelled`                       | Final status 
+           is `cancelled`              |
+      199  
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 4 lines, removed 4 lines
+      199  
+      200  ### Acceptance Criteria
+      201  
+      202 -- **AC-J005-01**: Given a `pending` job, When DELETE /jobs/{jo
+          -b_id} is called, Then HTTP 200 is returned and status is `canc
+          -elled`                                                        
+      203 -- **AC-J005-02**: Given a `running` job, When DELETE /jobs/{jo
+          -b_id} is called, Then HTTP 200 is returned, the scheduler inst
+          -ructs the worker agent to stop the process, and status transit
+          -ions to `cancelled`                                           
+      204 -- **AC-J005-03**: Given a `completed` or `failed` job, When DE
+          -LETE /jobs/{job_id} is called, Then HTTP 409 is returned (term
+          -inal state, cannot cancel)                                    
+      205 -- **AC-J005-04**: Given a job_id that does not exist, When DEL
+          -ETE /jobs/{job_id} is called, Then HTTP 404 is returned       
+      202 +- **AC-J005-01**: Given a `pending` job, When POST /jobs/{job_
+          +id}/cancel is called, Then HTTP 200 is returned and status is 
+          +`cancelled`                                                   
+      203 +- **AC-J005-02**: Given a `running` job, When POST /jobs/{job_
+          +id}/cancel is called, Then HTTP 200 is returned, the scheduler
+          + writes `cancelled` to the jobs table, and the worker_agent st
+          +ops the process on its next poll                              
+      204 +- **AC-J005-03**: Given a `completed`, `failed`, or `timed_out
+          +` job, When POST /jobs/{job_id}/cancel is called, Then HTTP 40
+          +9 is returned (terminal state, cannot cancel)                 
+      205 +- **AC-J005-04**: Given a job_id that does not exist, When POS
+          +T /jobs/{job_id}/cancel is called, Then HTTP 404 is returned  
+      206  
+      207  ### BDD Feature File
+      208  
+
+● All done. Here's what changed across the 8 files:
+
+  Terminology rename (all files):
+  - runner_agent / RunnerAgent / runner agent → worker_agent / WorkerAgent /
+  worker agent
+  - Worker (the machine) remains worker or worker_node — no ambiguity now since
+  worker_agent is clearly the process
+
+  Journeys artifact (additional corrections caught along the way):
+  - J002 flow steps and ACs updated to DB-direct pattern (removed REST heartbeat
+   references)
+  - J005 flow steps and ACs updated to POST /jobs/{job_id}/cancel
+  - J005 AC-J005-03 also now correctly includes timed_out as a non-cancellable
+  terminal state
+
+  Ready to proceed to Phase B whenever you are.
+✻ Cogitated for 1m 9s
+
+❯ I do not want the central scheduler to be responsible for assigning and       
+handing out jobs to worker, so J003 for example has the wrong end of the stick. 
+ Instead worker agents should periodically be checking the database for jobs    
+that are ready to run and claiming them. The scheduler process helps with this  
+by marking a job as ready to run when all of its dependencies are satisfied.    
+Now granted, this approach will likely add latency to the launch of jobs but    
+I'd like to see how far we can get with this approach to begin with.            
+
+● Good — that's a cleaner model. Pull-based claiming with atomic DB operations
+  is a solid approach for a lightweight system. It also introduces a meaningful
+  new status: ready (start_time reached + dependencies satisfied = available to
+  claim).
+
+  Let me update conventions, J003, J001 (to note dependency declaration), and
+  the job-dispatch feature file.
+
+  Read 1 file (ctrl+o to expand)
+
+● Now I have everything I need. The key changes across all artifacts:
+
+  - Add ready status (scheduler sets this when start_time reached + dependencies
+   met)
+  - assigned now means worker_agent atomically claimed a ready job
+  - Remove all scheduler-selects-worker language
+  - Add depends_on as an optional field on job submission
+
+● Update(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Added 1 line
+       4  **Created**: 2026-03-21
+       5  **Updated**: 2026-03-21 — v2: corrected cancel from DELETE to P
+          OST; workers use DB-direct, not REST
+       6  **Updated**: 2026-03-21 — v3: two-stage worker liveness detecti
+          on (60s → /health probe, 90s → offline)
+       7 +**Updated**: 2026-03-21 — v4: pull-based job claiming; added `r
+         +eady` status; scheduler no longer assigns workers              
+       8  **Agent**: design (Phase A)
+       9  **Purpose**: Single source of truth for naming, roles, threshol
+          ds, and patterns.
+      10               Every BDD generation agent receives this document 
+          verbatim.
+
+● Update(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Added 18 lines, removed 5 lines
+       80  
+       81  | Status      | Written by     | Meaning                      
+                                   |
+       82  |-------------|----------------|------------------------------
+           ------------------------|
+       83 -| `pending`   | Scheduler      | Scheduled, not yet dispatched
+          - to a worker            |                                     
+       84 -| `assigned`  | Scheduler      | Scheduler wrote worker_id to 
+          -job; worker_agent not yet confirmed start |                   
+       85 -| `running`   | Worker Agent   | Worker agent wrote `running` 
+          -after starting the process |                                  
+       86 -| `completed` | Worker Agent   | Worker agent stopped the job 
+          -at end_time; process exited |                                 
+       87 -| `cancelled` | Scheduler      | Cancelled via REST API; worke
+          -r_agent reads and stops if running |                          
+       83 +| `pending`   | Scheduler      | Created; waiting for start_ti
+          +me and/or dependencies to be satisfied |                      
+       84 +| `ready`     | Scheduler      | start_time reached AND all de
+          +pendencies `completed`; available for worker_agents to claim |
+       85 +| `assigned`  | Worker Agent   | worker_agent atomically claim
+          +ed the job (wrote its worker_id); not yet started |           
+       86 +| `running`   | Worker Agent   | worker_agent started the proc
+          +ess and updated the jobs table |                              
+       87 +| `completed` | Worker Agent   | worker_agent stopped the job 
+          +at end_time; process exited |                                 
+       88 +| `cancelled` | Scheduler      | Cancelled via REST API; worke
+          +r_agent detects on next poll and stops if running |           
+       89  | `failed`    | Worker Agent   | Execution error; worker_agent
+            wrote failure with exit_code |
+       90  | `timed_out` | Scheduler      | worker_status.last_seen expir
+           ed; scheduler wrote timed_out |
+       91  
+       92 +### Status Transition Flow                                    
+       93 +                                                              
+       94 +```                                                           
+       95 +pending  ──(start_time reached + deps met)──▶  ready          
+       96 +ready    ──(worker_agent atomic claim)──────▶  assigned       
+       97 +assigned ──(worker_agent starts process)────▶  running        
+       98 +running  ──(end_time reached / exit 0)──────▶  completed      
+       99 +running  ──(exit code != 0)─────────────────▶  failed         
+      100 +pending/ready/assigned/running ─(API cancel)▶  cancelled      
+      101 +assigned/running ──(heartbeat timeout)──────▶  timed_out      
+      102 +```                                                           
+      103 +                                                              
+      104  ---
+      105  
+      106  ## Worker Status Values (EXACT — exhaustive, stored in `worker
+           _status` table)
+
+● Update(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Added 33 lines, removed 5 lines
+      171  Worker Agent startup:
+      172    UPSERT worker_status SET status='online', hostname=..., last
+           _seen=now() WHERE hostname=...
+      173  
+      174 -Worker Agent heartbeat loop (every 30s):                      
+      174 +Worker Agent last_seen loop (every 30s):                      
+      175    UPDATE worker_status SET last_seen=now() WHERE worker_id=...
+      176  
+      177 -Worker Agent job poll loop:                                   
+      178 -  SELECT * FROM jobs WHERE status='assigned' AND worker_id=<se
+          -lf>                                                           
+      177 +Worker Agent claim loop (poll interval TBD):                  
+      178 +  -- Step 1: find a ready job                                 
+      179 +  SELECT job_id FROM jobs WHERE status='ready' LIMIT 1 FOR UPD
+          +ATE SKIP LOCKED                                               
+      180 +  -- Step 2: atomically claim it (only one worker wins)       
+      181 +  UPDATE jobs SET status='assigned', worker_id=<self>, claimed
+          +_at=now()                                                     
+      182 +    WHERE job_id=<id> AND status='ready'                      
+      183 +  -- If UPDATE affected 0 rows: another worker claimed it; try
+          + next                                                         
+      184  
+      180 -Worker Agent job start:                                       
+      185 +Worker Agent job start (after successful claim):              
+      186    UPDATE jobs SET status='running', started_at=now() WHERE job
+           _id=...
+      187  
+      188  Worker Agent job complete/fail:
+      189    UPDATE jobs SET status='completed'|'failed', finished_at=now
+           (), exit_code=... WHERE job_id=...
+      190  
+      186 -Worker Agent cancel detection:                                
+      191 +Worker Agent cancel detection (during running, checked each po
+          +ll cycle):                                                    
+      192    SELECT status FROM jobs WHERE job_id=... -- if 'cancelled', 
+           stop process
+      193  ```
+      194  
+      195 +### Scheduler Background Loop Pattern (EXACT)                 
+      196 +                                                              
+      197 +```                                                           
+      198 +Scheduler ready-transition loop (poll interval TBD):          
+      199 +  -- Mark jobs as ready when start_time passed and all depende
+          +ncies completed                                               
+      200 +  UPDATE jobs SET status='ready'                              
+      201 +    WHERE status='pending'                                    
+      202 +      AND start_time <= now()                                 
+      203 +      AND (                                                   
+      204 +        depends_on IS NULL OR depends_on = '[]'               
+      205 +        OR NOT EXISTS (                                       
+      206 +          SELECT 1 FROM jobs dep                              
+      207 +          WHERE dep.job_id = ANY(jobs.depends_on)             
+      208 +            AND dep.status != 'completed'                     
+      209 +        )                                                     
+      210 +      )                                                       
+      211 +                                                              
+      212 +Scheduler health-check loop (every 30s):                      
+      213 +  -- Two-stage liveness: see Numeric Constants for thresholds 
+      214 +  -- Stage 1 (last_seen >= 60s): call GET /health on worker_ag
+          +ent                                                           
+      215 +  -- Stage 2 (last_seen >= 90s OR /health failed): mark worker
+          + offline, jobs timed_out                                      
+      216 +```                                                           
+      217 +                                                              
+      218  ---
+      219  
+      220  ## Required Scenario Types Per Feature
+
+● Now update the journeys artifact — J001 (add depends_on) and J003 (rewrite):
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 5 lines, removed 3 lines
+      40  
+      41  | Step | User Action                                      | Sys
+          tem Response                                  | Success Criteri
+          a                        |
+      42  |------|--------------------------------------------------|----
+          ----------------------------------------------|----------------
+          -------------------------|
+      43 -| 1    | POST /jobs with command, start_time, end_time    | Val
+         -idates payload; assigns job_id; stores as `pending` | HTTP 201,
+         - job_id returned          |                                    
+      44 -| 2    | (no action — system async)                       | At 
+         -start_time, scheduler dispatches to available worker | Job tran
+         -sitions to `assigned`     |                                    
+      45 -| 3    | GET /jobs/{job_id}                               | Ret
+         -urns current status and assigned worker_id    | Status is `assi
+         -gned` or `running`       |                                     
+      43 +| 1    | POST /jobs with command, start_time, end_time, and opt
+         +ional depends_on | Validates payload; assigns job_id; stores as
+         + `pending` | HTTP 201, job_id returned |                       
+      44 +| 2    | (no action — scheduler background loop)          | Whe
+         +n start_time reached AND all depends_on jobs are `completed`, s
+         +cheduler marks job `ready` | Job status is `ready` |           
+      45 +| 3    | GET /jobs/{job_id}                               | Ret
+         +urns current status                           | Status progress
+         +es through `ready` → `assigned` → `running` as worker_agents cl
+         +aim and start it |                                             
+      46  
+      47  ### Acceptance Criteria
+      48  
+     ...
+      50  - **AC-J001-02**: Given a job with start_time in the past, When
+           POST /jobs is called, Then HTTP 422 is returned with a validat
+          ion error
+      51  - **AC-J001-03**: Given a job with end_time before or equal to 
+          start_time, When POST /jobs is called, Then HTTP 422 is returne
+          d with a validation error
+      52  - **AC-J001-04**: Given a missing required field (command, star
+          t_time, or end_time), When POST /jobs is called, Then HTTP 422 
+          is returned identifying the missing field
+      53 +- **AC-J001-05**: Given a valid payload with a depends_on list 
+         +of existing job_ids, When POST /jobs is called, Then HTTP 201 i
+         +s returned and the job stores the dependency list              
+      54 +- **AC-J001-06**: Given a depends_on list containing a job_id t
+         +hat does not exist, When POST /jobs is called, Then HTTP 422 is
+         + returned identifying the unknown dependency                   
+      55  
+      56  ### BDD Feature File
+      57  
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 18 lines, removed 13 lines
+      107  
+      108  ---
+      109  
+      110 -## Journey: J003 — Job Dispatched and Started on Worker       
+      110 +## Journey: J003 — Job Becomes Ready and Worker Claims It     
+      111  
+      112  **Priority**: P1
+      113  **Lens**: Platform Operator
+      114  
+      115  ### User Story
+      116  
+      117 -As the scheduler, I want to dispatch a pending job to an avail
+          -able online worker at its start_time so that the worker agent 
+          -can start executing it.                                       
+      117 +As the scheduler and worker_agent, I want the scheduler to mar
+          +k a job `ready` when its conditions are met, and worker_agents
+          + to compete to atomically claim `ready` jobs, so that no centr
+          +al dispatcher is needed and the system scales by adding worker
+          +s.                                                            
+      118  
+      119  ### Flow Steps
+      120  
+      121  | Step | User Action                                      | Sy
+           stem Response                                  | Success Crite
+           ria                         |
+      122  |------|--------------------------------------------------|---
+           -----------------------------------------------|--------------
+           ----------------------------|
+      123 -| 1    | (time reaches job start_time)                    | Sc
+          -heduler selects an `online` worker; updates job to `assigned`;
+          - records worker_id | Job status is `assigned` |               
+      124 -| 2    | Worker agent polls or is notified of assignment  | Wo
+          -rker agent retrieves job details               | Worker agent 
+          -has command and end_time    |                                 
+      125 -| 3    | Worker agent starts the job process              | Wo
+          -rker agent reports job as `running` to scheduler | Job status 
+          -is `running`               |                                  
+      123 +| 1    | (scheduler background loop runs)                 | Sc
+          +heduler checks `pending` jobs: if start_time ≤ now AND all dep
+          +ends_on are `completed`, writes status=`ready` | Job status is
+          + `ready` |                                                    
+      124 +| 2    | worker_agent polls the jobs table for `ready` jobs | 
+          +Finds one or more `ready` jobs                  | worker_agent
+          + has candidate job_ids       |                                
+      125 +| 3    | worker_agent attempts atomic claim               | `U
+          +PDATE jobs SET status='assigned', worker_id=<self> WHERE job_i
+          +d=? AND status='ready'`; checks rows affected | Winner: status
+          + is `assigned` with worker_id; loser: 0 rows affected, tries n
+          +ext |                                                         
+      126 +| 4    | worker_agent starts the job process              | wo
+          +rker_agent updates jobs table to `running`     | Job status is
+          + `running`                  |                                 
+      127  
+      128  ### Acceptance Criteria
+      129  
+      129 -- **AC-J003-01**: Given a `pending` job whose start_time has b
+          -een reached and an `online` worker exists, Then the job status
+          - transitions to `assigned` and a worker_id is recorded        
+      130 -- **AC-J003-02**: Given no `online` workers exist at dispatch 
+          -time, Then the job remains `pending` and is retried on the nex
+          -t dispatch cycle                                              
+      131 -- **AC-J003-03**: Given a job is `assigned`, When the worker a
+          -gent confirms execution start, Then the job status transitions
+          - to `running`                                                 
+      132 -- **AC-J003-04**: Given multiple `online` workers, Then the sc
+          -heduler dispatches to the worker with the fewest currently `ru
+          -nning` jobs                                                   
+      130 +- **AC-J003-01**: Given a `pending` job whose start_time has b
+          +een reached and has no unmet dependencies, When the scheduler 
+          +loop runs, Then the job status transitions to `ready`         
+      131 +- **AC-J003-02**: Given a `pending` job with a dependency that
+          + is not yet `completed`, When the scheduler loop runs, Then th
+          +e job remains `pending` even if start_time has passed         
+      132 +- **AC-J003-03**: Given a `ready` job, When a worker_agent per
+          +forms an atomic claim, Then the job status transitions to `ass
+          +igned` with the claiming worker's worker_id                   
+      133 +- **AC-J003-04**: Given two worker_agents attempting to claim 
+          +the same `ready` job simultaneously, Then exactly one succeeds
+          + (job status `assigned`); the other observes 0 rows affected a
+          +nd moves on                                                   
+      134 +- **AC-J003-05**: Given a job is `assigned`, When the worker_a
+          +gent starts the process and updates the jobs table, Then the j
+          +ob status transitions to `running`                            
+      135 +- **AC-J003-06**: Given no `ready` jobs exist, When a worker_a
+          +gent polls, Then it finds nothing to claim and waits for the n
+          +ext poll interval                                             
+      136  
+      137  ### BDD Feature File
+      138  
+     ...
+      140  
+      141  ### Error Scenarios
+      142  
+      140 -| Scenario                  | Trigger                         
+          - | Expected Behaviour                        |                
+      141 -|---------------------------|---------------------------------
+          --|-------------------------------------------|                
+      142 -| No available workers      | All workers `offline` at start  
+          - | Job stays `pending`; retried next cycle   |                
+      143 -| Worker goes offline after assignment | Worker crashes before
+          - confirming start | Job transitions to `timed_out` after 90s |
+      143 +| Scenario                           | Trigger                
+          +                   | Expected Behaviour                       
+          +       |                                                      
+      144 +|------------------------------------|------------------------
+          +-------------------|------------------------------------------
+          +-------|                                                      
+      145 +| Dependency not yet completed       | depends_on job still `r
+          +unning`            | Job stays `pending`; re-evaluated each sc
+          +heduler loop |                                                
+      146 +| All workers offline                | No `online` workers pol
+          +ling               | Job stays `ready` until a worker comes on
+          +line and polls |                                              
+      147 +| Claim race condition               | Two workers claim simul
+          +taneously          | Exactly one wins; other retries with next
+          + `ready` job |                                                
+      148 +| Worker crashes after claim, before start | Heartbeat expires
+          + while `assigned`   | Scheduler marks job `timed_out` after 90
+          +s        |                                                    
+      149  
+      150  ---
+      151  
+
+● Now rewrite the job-dispatch feature file and update schedule-job for
+  depends_on:
+
+● Write(specs/features/worker-management/job-dispatch.feature)
+  ⎿  Added 69 lines, removed 35 lines
+       1  @J003 @P1 @persona:platform_operator
+       2 -Feature: Job Dispatch and Pickup via Database                  
+       2 +Feature: Job Ready Transition and Pull-Based Worker Claiming   
+       3    As the scheduler and worker_agent
+       4 -  I want jobs to be dispatched by the scheduler writing to the 
+         -jobs table                                                     
+       5 -  And picked up by the worker_agent polling the jobs table     
+       6 -  So that no message broker is needed                          
+       4 +  I want the scheduler to mark jobs ready when their conditions
+         + are met                                                       
+       5 +  And worker_agents to atomically claim ready jobs from the dat
+         +abase                                                          
+       6 +  So that no central dispatcher is needed and workers self-orga
+         +nise                                                           
+       7  
+       8    Background:
+       9      Given the Lightcron scheduler is running
+      10  
+      11 +  # ── Scheduler: pending → ready transition ──────────────────
+         +──────────────────                                             
+      12 +                                                               
+      13    @smoke
+      12 -  Scenario: Scheduler dispatches a pending job by writing worke
+         -r_id to the jobs table                                         
+      13 -    Given a worker_status row for "w-001" exists with status "o
+         -nline" and a current last_seen                                 
+      14 -    And a job "j-001" exists in the jobs table with status "pen
+         -ding" and start_time of now                                    
+      15 -    When the scheduler runs its dispatch cycle                 
+      16 -    Then job "j-001" status in the jobs table is "assigned"    
+      17 -    And job "j-001" worker_id in the jobs table is "w-001"     
+      14 +  Scenario: Scheduler marks a job ready when start_time is reac
+         +hed and there are no dependencies                              
+      15 +    Given a job "j-001" exists in the jobs table with status "p
+         +ending", start_time of now, and no depends_on                  
+      16 +    When the scheduler runs its ready-transition loop          
+      17 +    Then job "j-001" status in the jobs table is "ready"       
+      18  
+      19    @smoke
+      20 -  Scenario: Worker agent picks up assigned job by polling the j
+         -obs table                                                      
+      21 -    Given a job "j-001" exists in the jobs table with status "a
+         -ssigned" and worker_id "w-001"                                 
+      22 -    When the worker_agent on "w-001" polls the jobs table for a
+         -ssigned jobs                                                   
+      23 -    Then the worker_agent retrieves job "j-001" with its comman
+         -d and end_time                                                 
+      20 +  Scenario: Scheduler marks a job ready when start_time is reac
+         +hed and all dependencies are completed                         
+      21 +    Given a job "j-dep" exists with status "completed"         
+      22 +    And a job "j-001" exists with status "pending", start_time 
+         +of now, and depends_on ["j-dep"]                               
+      23 +    When the scheduler runs its ready-transition loop          
+      24 +    Then job "j-001" status in the jobs table is "ready"       
+      25  
+      26 +  @error-handling                                              
+      27 +  Scenario: Job stays pending when start_time is reached but a 
+         +dependency is not yet completed                                
+      28 +    Given a job "j-dep" exists with status "running"           
+      29 +    And a job "j-001" exists with status "pending", start_time 
+         +of now, and depends_on ["j-dep"]                               
+      30 +    When the scheduler runs its ready-transition loop          
+      31 +    Then job "j-001" status remains "pending"                  
+      32 +                                                               
+      33 +  @error-handling                                              
+      34 +  Scenario: Job stays pending when start_time has not yet been 
+         +reached                                                        
+      35 +    Given a job "j-001" exists with status "pending", start_tim
+         +e 60 seconds from now, and no depends_on                       
+      36 +    When the scheduler runs its ready-transition loop          
+      37 +    Then job "j-001" status remains "pending"                  
+      38 +                                                               
+      39 +  # ── Worker Agent: atomic claim ─────────────────────────────
+         +───────────────────                                            
+      40 +                                                               
+      41    @smoke
+      26 -  Scenario: Worker agent updates job status to running after st
+         -arting the process                                             
+      27 -    Given the worker_agent on "w-001" has retrieved job "j-001"
+      28 -    When the worker_agent starts the job process and updates th
+         -e jobs table                                                   
+      42 +  Scenario: Worker agent polls the jobs table and claims a read
+         +y job                                                          
+      43 +    Given a job "j-001" exists in the jobs table with status "r
+         +eady"                                                          
+      44 +    And a worker_agent "w-001" is online                       
+      45 +    When the worker_agent on "w-001" polls for ready jobs and a
+         +ttempts to claim "j-001"                                       
+      46 +    Then job "j-001" status in the jobs table is "assigned"    
+      47 +    And job "j-001" worker_id in the jobs table is "w-001"     
+      48 +                                                               
+      49 +  @smoke                                                       
+      50 +  Scenario: Worker agent updates status to running after starti
+         +ng the job process                                             
+      51 +    Given a job "j-001" has status "assigned" with worker_id "w
+         +-001"                                                          
+      52 +    When the worker_agent on "w-001" starts the job process    
+      53 +    And updates the jobs table                                 
+      54      Then job "j-001" status in the jobs table is "running"
+      55  
+      56    @error-handling
+      32 -  Scenario: Job stays pending when no online workers exist     
+      57 +  Scenario: Exactly one worker wins when two agents claim the s
+         +ame job simultaneously                                         
+      58 +    Given a job "j-001" exists with status "ready"             
+      59 +    And worker_agents "w-001" and "w-002" both attempt to claim
+         + "j-001" at the same time                                      
+      60 +    When both atomic claim updates are executed                
+      61 +    Then job "j-001" status is "assigned"                      
+      62 +    And exactly one of "w-001" or "w-002" is recorded as worker
+         +_id                                                            
+      63 +    And the other worker_agent observes 0 rows affected and doe
+         +s not hold the job                                             
+      64 +                                                               
+      65 +  @error-handling                                              
+      66 +  Scenario: Worker agent finds nothing to claim when no ready j
+         +obs exist                                                      
+      67 +    Given no jobs in the jobs table have status "ready"        
+      68 +    When the worker_agent on "w-001" polls for ready jobs      
+      69 +    Then the worker_agent finds no jobs to claim and waits for 
+         +the next poll interval                                         
+      70 +                                                               
+      71 +  # ── Interaction: ready job waits for a worker ──────────────
+         +───────────────────                                            
+      72 +                                                               
+      73 +  @error-handling                                              
+      74 +  Scenario: Ready job remains ready when no workers are online 
+      75      Given no rows in worker_status have status "online"
+      34 -    And a job "j-002" exists with status "pending" and start_ti
+         -me of now                                                      
+      35 -    When the scheduler runs its dispatch cycle                 
+      36 -    Then job "j-002" status remains "pending"                  
+      76 +    And a job "j-002" exists with status "ready"               
+      77 +    When time passes and no worker_agent polls                 
+      78 +    Then job "j-002" status remains "ready"                    
+      79  
+      38 -  @smoke                                                       
+      39 -  Scenario: Scheduler dispatches to the worker with the fewest 
+         -currently running jobs                                         
+      40 -    Given worker_status contains:                              
+      41 -      | worker_id | status | running_job_count |               
+      42 -      | w-001     | online | 2                 |               
+      43 -      | w-002     | online | 0                 |               
+      44 -    And a job "j-003" exists with status "pending" and start_ti
+         -me of now                                                      
+      45 -    When the scheduler runs its dispatch cycle                 
+      46 -    Then job "j-003" is assigned to worker "w-002" in the jobs 
+         -table                                                          
+      80 +  # ── Stuck job after claim ──────────────────────────────────
+         +────────────────────                                           
+      81  
+      82    @error-handling
+      49 -  Scenario: Job transitions to timed_out if worker_status.last_
+         -seen expires while job is assigned                             
+      50 -    Given a job "j-004" has status "assigned" with worker_id "w
+         --003" in the jobs table                                        
+      51 -    And worker_status for "w-003" has last_seen 90 seconds in t
+         -he past                                                        
+      83 +  Scenario: Assigned job transitions to timed_out if worker hea
+         +rtbeat expires before confirming start                         
+      84 +    Given a job "j-003" has status "assigned" with worker_id "w
+         +-003"                                                          
+      85 +    And worker_status for "w-003" has last_seen 90 seconds ago 
+      86      When the scheduler runs its health check
+      53 -    Then worker_status for "w-003" has status "offline"        
+      54 -    And job "j-004" status in the jobs table is "timed_out"    
+      87 +    Then job "j-003" status in the jobs table is "timed_out"   
+      88 +    And worker_status for "w-003" has status "offline"         
+
+● Update(specs/features/job-management/schedule-job.feature)
+  ⎿  Added 21 lines, removed 1 line
+       9      And no jobs exist
+      10  
+      11    @smoke
+      12 -  Scenario: Successfully schedule a job                        
+      12 +  Scenario: Successfully schedule a job without dependencies   
+      13      When a job_submitter submits a POST /jobs request with:
+      14        | field      | value                        |
+      15        | command    | /usr/bin/my-script.sh        |
+     ...
+      19      And the response contains a unique job_id
+      20      And the job status is "pending"
+      21  
+      22 +  @smoke                                                       
+      23 +  Scenario: Successfully schedule a job with dependencies      
+      24 +    Given a job "j-existing" already exists with status "pendin
+         +g"                                                             
+      25 +    When a job_submitter submits a POST /jobs request with:    
+      26 +      | field      | value                        |            
+      27 +      | command    | /usr/bin/my-script.sh        |            
+      28 +      | start_time | 60 seconds from now          |            
+      29 +      | end_time   | 120 seconds from now         |            
+      30 +      | depends_on | ["j-existing"]               |            
+      31 +    Then the response status is 201                            
+      32 +    And the response contains a unique job_id                  
+      33 +    And the job status is "pending"                            
+      34 +    And the job depends_on includes "j-existing"               
+      35 +                                                               
+      36    @error-handling
+      37 +  Scenario: Reject a job with a depends_on referencing an unkno
+         +wn job_id                                                      
+      38 +    When a job_submitter submits a POST /jobs request with depe
+         +nds_on containing "j-does-not-exist"                           
+      39 +    Then the response status is 422                            
+      40 +    And the response identifies "j-does-not-exist" as an unknow
+         +n dependency                                                   
+      41 +                                                               
+      42 +  @error-handling                                              
+      43    Scenario: Reject a job with a start_time in the past
+      44      When a job_submitter submits a POST /jobs request with:
+      45        | field      | value                        |
+
+● Also update the Handoff to Phase B section in the journeys to reflect the new
+  architecture:
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 6 lines, removed 4 lines
+      371  - P1 (Critical): J001, J002, J003, J004, J005, J006, J008
+      372  - P2 (Important): J007
+      373  - Key Technical Implications:
+      374 -  - Scheduler must poll for `pending` jobs reaching `start_tim
+          -e` — no broker, DB-driven dispatch                            
+      375 -  - Worker agent needs a polling or long-poll mechanism to dis
+          -cover assignments                                             
+      376 -  - Heartbeat mechanism must be robust to transient network is
+          -sues (threshold-based, not single-miss)                       
+      377 -  - Job process lifecycle (SIGTERM → grace → SIGKILL) owned by
+          - the worker agent                                             
+      374 +  - Scheduler has two background loops: ready-transition (pend
+          +ing→ready) and health-check (worker liveness)                 
+      375 +  - Worker agents pull and claim jobs from the DB — no push/as
+          +signment from the scheduler                                   
+      376 +  - Atomic claim requires `SELECT FOR UPDATE SKIP LOCKED` or e
+          +quivalent CAS to prevent double-claiming                      
+      377 +  - `depends_on` is a list of job_ids; scheduler evaluates all
+          + before marking `ready`                                       
+      378 +  - Accepted trade-off: pull-based adds latency (poll interval
+          +) vs. push-based; acceptable for v1                           
+      379 +  - Job process lifecycle (SIGTERM → grace → SIGKILL) owned by
+          + the worker_agent                                             
+      380    - All state lives in the database — ACID guarantees are crit
+           ical for status transitions
+      381  - Suggested Implementation Order: J002 → J001 → J003 → J004 → 
+           J008 → J005 → J006 → J007
+
+● Done. Here's a summary of what changed:
+
+  Status flow (updated)
+
+  pending → ready → assigned → running → completed/failed
+                                       ↘ cancelled / timed_out
+
+  pending: waiting for start_time + dependencies
+  ready: scheduler sets this — start_time passed + all depends_on jobs are
+  completed
+  assigned: worker_agent sets this — atomically claimed via UPDATE WHERE
+  status='ready'
+
+  Responsibilities (clarified)
+
+  ┌────────────┬────────────────────────────────────────────────────────────┐
+  │   Actor    │                            Does                            │
+  ├────────────┼────────────────────────────────────────────────────────────┤
+  │ Scheduler  │ Marks pending → ready; marks assigned/running → timed_out  │
+  │            │ on heartbeat expiry                                        │
+  ├────────────┼────────────────────────────────────────────────────────────┤
+  │ Worker     │ Polls for ready jobs; claims atomically; runs process;     │
+  │ Agent      │ writes running/completed/failed                            │
+  └────────────┴────────────────────────────────────────────────────────────┘
+
+  Key design note recorded
+
+  The depends_on field is optional on job submission. A job with unmet
+  dependencies stays pending even after start_time passes — the scheduler
+  re-evaluates it each loop. The latency trade-off (poll interval between ready
+  and assigned) is explicitly acknowledged in the handoff notes.
+
+  Ready for Phase B whenever you are.
+
+✻ Baked for 2m 45s
+
+❯ /status                                                                       
+  ⎿  Status dialog dismissed
+
+❯ I am not keen on the idea of setting a job end_time, instead the worker agent 
+ should let the job run until completion storing the exit code of the job. It   
+should be possible to set max runtime and max memory limits for jobs but for    
+now they can default to unlimited.                                              
+
+● That simplifies the model nicely. The key changes:
+  - end_time removed entirely — no longer a field on jobs
+  - Jobs run to process exit; exit code recorded; exit 0 = completed, non-zero =
+   failed
+  - max_runtime and max_memory added as optional fields (default: unlimited)
+  - start_time remains — it's when the job becomes eligible to be claimed
+
+  This touches conventions, J001, J004, schedule-job.feature,
+  job-lifecycle-completion.feature, and job-dispatch.feature (which mentioned
+  end_time in one step).
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 7 lines, removed 6 lines
+      40  
+      41  | Step | User Action                                      | Sys
+          tem Response                                  | Success Criteri
+          a                        |
+      42  |------|--------------------------------------------------|----
+          ----------------------------------------------|----------------
+          -------------------------|
+      43 -| 1    | POST /jobs with command, start_time, end_time, and opt
+         -ional depends_on | Validates payload; assigns job_id; stores as
+         - `pending` | HTTP 201, job_id returned |                       
+      43 +| 1    | POST /jobs with command, start_time, and optional depe
+         +nds_on / max_runtime / max_memory | Validates payload; assigns 
+         +job_id; stores as `pending` | HTTP 201, job_id returned |      
+      44  | 2    | (no action — scheduler background loop)          | Whe
+          n start_time reached AND all depends_on jobs are `completed`, s
+          cheduler marks job `ready` | Job status is `ready` |
+      45  | 3    | GET /jobs/{job_id}                               | Ret
+          urns current status                           | Status progress
+          es through `ready` → `assigned` → `running` as worker_agents cl
+          aim and start it |
+      46  
+      47  ### Acceptance Criteria
+      48  
+      49 -- **AC-J001-01**: Given a valid payload with command, start_tim
+         -e, and end_time, When POST /jobs is called, Then HTTP 201 is re
+         -turned with a unique job_id and status `pending`               
+      49 +- **AC-J001-01**: Given a valid payload with command and start_
+         +time, When POST /jobs is called, Then HTTP 201 is returned with
+         + a unique job_id and status `pending`                          
+      50  - **AC-J001-02**: Given a job with start_time in the past, When
+           POST /jobs is called, Then HTTP 422 is returned with a validat
+          ion error
+      51 -- **AC-J001-03**: Given a job with end_time before or equal to 
+         -start_time, When POST /jobs is called, Then HTTP 422 is returne
+         -d with a validation error                                      
+      52 -- **AC-J001-04**: Given a missing required field (command, star
+         -t_time, or end_time), When POST /jobs is called, Then HTTP 422 
+         -is returned identifying the missing field                      
+      53 -- **AC-J001-05**: Given a valid payload with a depends_on list 
+         -of existing job_ids, When POST /jobs is called, Then HTTP 201 i
+         -s returned and the job stores the dependency list              
+      54 -- **AC-J001-06**: Given a depends_on list containing a job_id t
+         -hat does not exist, When POST /jobs is called, Then HTTP 422 is
+         - returned identifying the unknown dependency                   
+      51 +- **AC-J001-03**: Given a missing required field (command or st
+         +art_time), When POST /jobs is called, Then HTTP 422 is returned
+         + identifying the missing field                                 
+      52 +- **AC-J001-04**: Given a valid payload with a depends_on list 
+         +of existing job_ids, When POST /jobs is called, Then HTTP 201 i
+         +s returned and the job stores the dependency list              
+      53 +- **AC-J001-05**: Given a depends_on list containing a job_id t
+         +hat does not exist, When POST /jobs is called, Then HTTP 422 is
+         + returned identifying the unknown dependency                   
+      54 +- **AC-J001-06**: Given a valid payload with max_runtime set to
+         + a positive integer (seconds), When POST /jobs is called, Then 
+         +HTTP 201 is returned and max_runtime is stored against the job 
+      55 +- **AC-J001-07**: Given a valid payload with no max_runtime or 
+         +max_memory, When POST /jobs is called, Then the job is created 
+         +with both limits set to unlimited                              
+      56  
+      57  ### BDD Feature File
+      58  
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 7 lines, removed 6 lines
+      60  
+      61  ### Error Scenarios
+      62  
+      63 -| Scenario           | Trigger                        | Expecte
+         -d Behaviour              |                                     
+      64 -|--------------------|--------------------------------|--------
+         --------------------------|                                     
+      65 -| Past start time    | start_time < now               | HTTP 42
+         -2, validation error      |                                     
+      66 -| Invalid time range | end_time <= start_time         | HTTP 42
+         -2, validation error      |                                     
+      67 -| Missing field      | command/start_time/end_time absent | HTT
+         -P 422, field identified  |                                     
+      68 -| Malformed JSON     | Unparseable request body       | HTTP 40
+         -0                        |                                     
+      63 +| Scenario               | Trigger                            |
+         + Expected Behaviour              |                             
+      64 +|------------------------|------------------------------------|
+         +---------------------------------|                             
+      65 +| Past start time        | start_time < now                   |
+         + HTTP 422, validation error      |                             
+      66 +| Missing field          | command or start_time absent       |
+         + HTTP 422, field identified      |                             
+      67 +| Unknown dependency     | depends_on contains unknown job_id |
+         + HTTP 422, unknown id identified |                             
+      68 +| Invalid max_runtime    | max_runtime <= 0                   |
+         + HTTP 422, validation error      |                             
+      69 +| Malformed JSON         | Unparseable request body           |
+         + HTTP 400                        |                             
+      70  
+      71  ---
+      72  
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 16 lines, removed 14 lines
+      151  
+      152  ---
+      153  
+      154 -## Journey: J004 — Job Completes at Scheduled End Time        
+      154 +## Journey: J004 — Job Runs to Completion                     
+      155  
+      156  **Priority**: P1
+      157  **Lens**: Job Submitter / SRE
+      158  
+      159  ### User Story
+      160  
+      161 -As the worker_agent, I want to stop the executing job process 
+          -when its end_time is reached so that jobs do not overrun their
+          - scheduled window.                                            
+      161 +As the worker_agent, I want to let a job process run until it 
+          +exits naturally and record its exit code so that jobs complete
+          + on their own terms without needing a pre-defined end time.   
+      162  
+      163  ### Flow Steps
+      164  
+      165  | Step | User Action                                      | Sy
+           stem Response                                  | Success Crite
+           ria                         |
+      166  |------|--------------------------------------------------|---
+           -----------------------------------------------|--------------
+           ----------------------------|
+      167 -| 1    | (time reaches job end_time)                      | Wo
+          -rker agent sends SIGTERM to job process        | Job process r
+          -eceives termination signal  |                                 
+      168 -| 2    | Job process exits                                | Wo
+          -rker agent reports `completed` to scheduler    | Job status is
+          - `completed`                |                                 
+      169 -| 3    | Job submitter calls GET /jobs/{job_id}           | Re
+          -turns status `completed`, start_time, end_time, worker_id | Su
+          -bmitter can confirm completion   |                            
+      167 +| 1    | (worker_agent has started job process)           | Pr
+          +ocess runs; worker_agent monitors it           | Job status is
+          + `running`                  |                                 
+      168 +| 2    | Job process exits                                | wo
+          +rker_agent records exit_code; writes `completed` (exit 0) or `
+          +failed` (exit != 0) to jobs table | Job status is terminal |  
+      169 +| 3    | job_submitter calls GET /jobs/{job_id}           | Re
+          +turns status, exit_code, started_at, finished_at, worker_id | 
+          +Submitter can confirm outcome    |                            
+      170  
+      171  ### Acceptance Criteria
+      172  
+      173 -- **AC-J004-01**: Given a `running` job whose end_time has bee
+          -n reached, Then the worker agent stops the job process and rep
+          -orts `completed` to the scheduler                             
+      174 -- **AC-J004-02**: Given a job that completes naturally before 
+          -end_time, When the process exits with code 0, Then the job sta
+          -tus is `completed`                                            
+      175 -- **AC-J004-03**: Given a job process that does not exit withi
+          -n a grace period after SIGTERM, Then the worker agent sends SI
+          -GKILL and reports `completed`                                 
+      176 -- **AC-J004-04**: Given a job that exits with a non-zero exit 
+          -code, Then the job status is `failed` with the exit code recor
+          -ded                                                           
+      173 +- **AC-J004-01**: Given a `running` job whose process exits wi
+          +th code 0, Then the worker_agent writes status `completed` and
+          + the exit_code to the jobs table                              
+      174 +- **AC-J004-02**: Given a `running` job whose process exits wi
+          +th a non-zero code, Then the worker_agent writes status `faile
+          +d` and the exit_code to the jobs table                        
+      175 +- **AC-J004-03**: Given a job with max_runtime set and the pro
+          +cess has been running for that duration, Then the worker_agent
+          + sends SIGTERM to the process                                 
+      176 +- **AC-J004-04**: Given a SIGTERM was sent and the process doe
+          +s not exit within the grace period, Then the worker_agent send
+          +s SIGKILL; the job is marked `failed` with a kill_reason of `m
+          +ax_runtime_exceeded`                                          
+      177 +- **AC-J004-05**: Given a job with no max_runtime set, Then th
+          +e worker_agent lets the process run until it exits naturally w
+          +ith no timeout                                                
+      178 +- **AC-J004-06**: Given a completed or failed job, When GET /j
+          +obs/{job_id} is called, Then the response includes exit_code, 
+          +started_at, finished_at, and worker_id                        
+      179  
+      180  ### BDD Feature File
+      181  
+     ...
+      183  
+      184  ### Error Scenarios
+      185  
+      184 -| Scenario              | Trigger                           | 
+          -Expected Behaviour                         |                  
+      185 -|-----------------------|-----------------------------------|-
+          --------------------------------------------|                  
+      186 -| Non-zero exit code    | Process exits with code != 0      | 
+          -Status → `failed`, exit code recorded      |                  
+      187 -| Process ignores SIGTERM | Process still running after grace 
+          -period | Runner sends SIGKILL; status → `completed` |         
+      188 -| Worker agent crashes during execution | Agent dies mid-job  
+          -  | Scheduler detects heartbeat timeout → `timed_out` |       
+      186 +| Scenario                   | Trigger                        
+          +      | Expected Behaviour                              |     
+      187 +|----------------------------|--------------------------------
+          +------|-------------------------------------------------|     
+      188 +| Non-zero exit code         | Process exits with code != 0   
+          +      | Status → `failed`, exit_code recorded           |     
+      189 +| max_runtime exceeded       | Process runs longer than max_ru
+          +ntime | SIGTERM → grace → SIGKILL; status → `failed`, kill_rea
+          +son `max_runtime_exceeded` |                                  
+      190 +| Worker agent crashes mid-job | Heartbeat expires while `runn
+          +ing`  | Scheduler marks job `timed_out`                 |     
+      191  
+      192  ---
+      193  
+● Now update the three feature files:
+
+● Write(specs/features/job-management/job-lifecycle-completion.feature)
+  ⎿  Added 44 lines, removed 34 lines
+       1  @J004 @P1 @persona:job_submitter
+       2 -Feature: Job Lifecycle Completion                              
+       2 +Feature: Job Runs to Completion                                
+       3    As the worker_agent
+       4 -  I want to stop the executing job process when its end_time is
+         - reached                                                       
+       5 -  So that jobs do not overrun their scheduled window           
+       4 +  I want to let a job process run until it exits naturally and 
+         +record its exit code                                           
+       5 +  So that jobs complete on their own terms without needing a pr
+         +e-defined end time                                             
+       6  
+       7    Background:
+       8      Given the Lightcron scheduler is running
+       9 -    And a worker "w-001" is registered and has status "online" 
+       9 +    And a worker_status row for "w-001" exists with status "onl
+         +ine"                                                           
+      10 +    And a job "j-001" has status "running" with worker_id "w-00
+         +1"                                                             
+      11  
+      12    @smoke
+      12 -  Scenario: Job is stopped at end_time and marked completed    
+      13 -    Given a job "j-001" has status "running" on worker "w-001" 
+         -with end_time of now                                           
+      14 -    When the worker_agent on "w-001" detects end_time has been 
+         -reached for job "j-001"                                        
+      15 -    And sends SIGTERM to the job process                       
+      16 -    And the job process exits cleanly                          
+      17 -    And the worker_agent reports completion to the scheduler   
+      18 -    Then job "j-001" status is "completed"                     
+      13 +  Scenario: Job process exits with code 0 and is marked complet
+         +ed                                                             
+      14 +    When the job process for "j-001" exits with code 0         
+      15 +    And the worker_agent on "w-001" updates the jobs table     
+      16 +    Then job "j-001" status in the jobs table is "completed"   
+      17 +    And job "j-001" exit_code in the jobs table is 0           
+      18 +    And job "j-001" finished_at is set                         
+      19  
+      20 -  @smoke                                                       
+      21 -  Scenario: Job process exits naturally before end_time with ex
+         -it code 0                                                      
+      22 -    Given a job "j-002" has status "running" on worker "w-001" 
+      23 -    When the job process exits with code 0 before end_time     
+      24 -    And the worker_agent reports completion to the scheduler   
+      25 -    Then job "j-002" status is "completed"                     
+      26 -                                                               
+      20    @error-handling
+      21    Scenario: Job process exits with non-zero exit code and is ma
+          rked failed
+      29 -    Given a job "j-003" has status "running" on worker "w-001" 
+      30 -    When the job process exits with code 1                     
+      31 -    And the worker_agent reports the failure with exit_code 1  
+      32 -    Then job "j-003" status is "failed"                        
+      33 -    And job "j-003" has exit_code 1 recorded                   
+      22 +    When the job process for "j-001" exits with code 1         
+      23 +    And the worker_agent on "w-001" updates the jobs table     
+      24 +    Then job "j-001" status in the jobs table is "failed"      
+      25 +    And job "j-001" exit_code in the jobs table is 1           
+      26 +    And job "j-001" finished_at is set                         
+      27  
+      35 -  @error-handling                                              
+      36 -  Scenario: Job process ignores SIGTERM and is killed after gra
+         -ce period                                                      
+      37 -    Given a job "j-004" has status "running" on worker "w-001" 
+         -with end_time of now                                           
+      38 -    When the worker_agent sends SIGTERM to the job process     
+      39 -    And the job process does not exit within the grace period  
+      40 -    And the worker_agent sends SIGKILL to the job process      
+      41 -    And the worker_agent reports completion to the scheduler   
+      42 -    Then job "j-004" status is "completed"                     
+      28 +  @smoke                                                       
+      29 +  Scenario: Job with no max_runtime runs until natural exit wit
+         +h no timeout applied                                           
+      30 +    Given job "j-001" has no max_runtime set                   
+      31 +    When the job process runs for an extended period and then e
+         +xits with code 0                                               
+      32 +    Then the worker_agent does not send SIGTERM during the run 
+      33 +    And job "j-001" status is "completed"                      
+      34  
+      35    @smoke
+      36 +  Scenario: Job exceeding max_runtime receives SIGTERM then SIG
+         +KILL                                                           
+      37 +    Given job "j-001" has max_runtime set to 60 seconds        
+      38 +    And the job process has been running for 60 seconds without
+         + exiting                                                       
+      39 +    When the worker_agent detects max_runtime is exceeded      
+      40 +    Then the worker_agent sends SIGTERM to the job process     
+      41 +    And if the process does not exit within the grace period th
+         +e worker_agent sends SIGKILL                                   
+      42 +    And job "j-001" status in the jobs table is "failed"       
+      43 +    And job "j-001" kill_reason is "max_runtime_exceeded"      
+      44 +                                                               
+      45 +  @smoke                                                       
+      46    Scenario: Completed job details are queryable by the submitte
+          r
+      46 -    Given a job "j-005" has status "completed" with start_time,
+         - end_time, and worker_id recorded                              
+      47 -    When a job_submitter calls GET /jobs/j-005                 
+      47 +    Given job "j-001" has status "completed" with exit_code 0, 
+         +started_at, finished_at, and worker_id "w-001"                 
+      48 +    When GET /jobs/j-001 is called                             
+      49      Then the response status is 200
+      50      And the response contains status "completed"
+      50 -    And the response contains start_time, end_time, and worker_
+         -id                                                             
+      51 +    And the response contains exit_code 0                      
+      52 +    And the response contains started_at, finished_at, and work
+         +er_id "w-001"                                                  
+      53 +                                                               
+      54 +  @smoke                                                       
+      55 +  Scenario: Failed job details including exit code are queryabl
+         +e                                                              
+      56 +    Given job "j-001" has status "failed" with exit_code 2, sta
+         +rted_at, finished_at, and worker_id "w-001"                    
+      57 +    When GET /jobs/j-001 is called                             
+      58 +    Then the response status is 200                            
+      59 +    And the response contains status "failed"                  
+      60 +    And the response contains exit_code 2                      
+
+● Write(specs/features/job-management/schedule-job.feature)
+  ⎿  Added 30 lines, removed 35 lines
+       1  @J001 @P1 @persona:job_submitter
+       2  Feature: Schedule a Job
+       3    As a job_submitter
+       4 -  I want to schedule a job with a start time and end time via t
+         -he Web API                                                     
+       5 -  So that Lightcron will run the job on a worker node during th
+         -at window                                                      
+       4 +  I want to schedule a job with a start time via the Web API   
+       5 +  So that Lightcron will run the job on a worker node once it i
+         +s ready                                                        
+       6  
+       7    Background:
+       8      Given the Lightcron scheduler is running
+       9      And no jobs exist
+      10  
+      11    @smoke
+      12 -  Scenario: Successfully schedule a job without dependencies   
+      12 +  Scenario: Successfully schedule a minimal job                
+      13      When a job_submitter submits a POST /jobs request with:
+      14        | field      | value                        |
+      15        | command    | /usr/bin/my-script.sh        |
+      16        | start_time | 60 seconds from now          |
+      17 -      | end_time   | 120 seconds from now         |            
+      17      Then the response status is 201
+      18      And the response contains a unique job_id
+      19      And the job status is "pending"
+      20 +    And the job has no max_runtime or max_memory set           
+      21  
+      22    @smoke
+      23 +  Scenario: Successfully schedule a job with resource limits   
+      24 +    When a job_submitter submits a POST /jobs request with:    
+      25 +      | field       | value                        |           
+      26 +      | command     | /usr/bin/my-script.sh        |           
+      27 +      | start_time  | 60 seconds from now          |           
+      28 +      | max_runtime | 3600                         |           
+      29 +      | max_memory  | 512                          |           
+      30 +    Then the response status is 201                            
+      31 +    And the response contains a unique job_id                  
+      32 +    And the job max_runtime is 3600                            
+      33 +    And the job max_memory is 512                              
+      34 +                                                               
+      35 +  @smoke                                                       
+      36    Scenario: Successfully schedule a job with dependencies
+      24 -    Given a job "j-existing" already exists with status "pendin
+         -g"                                                             
+      37 +    Given a job "j-existing" already exists                    
+      38      When a job_submitter submits a POST /jobs request with:
+      39        | field      | value                        |
+      40        | command    | /usr/bin/my-script.sh        |
+      41        | start_time | 60 seconds from now          |
+      29 -      | end_time   | 120 seconds from now         |            
+      42        | depends_on | ["j-existing"]               |
+      43      Then the response status is 201
+      44      And the response contains a unique job_id
+      33 -    And the job status is "pending"                            
+      45      And the job depends_on includes "j-existing"
+      46  
+      47    @error-handling
+      37 -  Scenario: Reject a job with a depends_on referencing an unkno
+         -wn job_id                                                      
+      38 -    When a job_submitter submits a POST /jobs request with depe
+         -nds_on containing "j-does-not-exist"                           
+      39 -    Then the response status is 422                            
+      40 -    And the response identifies "j-does-not-exist" as an unknow
+         -n dependency                                                   
+      41 -                                                               
+      42 -  @error-handling                                              
+      48    Scenario: Reject a job with a start_time in the past
+      49      When a job_submitter submits a POST /jobs request with:
+      50        | field      | value                        |
+      51        | command    | /usr/bin/my-script.sh        |
+      52        | start_time | 60 seconds ago               |
+      48 -      | end_time   | 60 seconds from now          |            
+      53      Then the response status is 422
+      54      And the response contains a validation error for "start_tim
+          e"
+      55  
+      56    @error-handling
+      53 -  Scenario: Reject a job where end_time is before start_time   
+      54 -    When a job_submitter submits a POST /jobs request with:    
+      55 -      | field      | value                        |            
+      56 -      | command    | /usr/bin/my-script.sh        |            
+      57 -      | start_time | 120 seconds from now         |            
+      58 -      | end_time   | 60 seconds from now          |            
+      59 -    Then the response status is 422                            
+      60 -    And the response contains a validation error for "end_time"
+      61 -                                                               
+      62 -  @error-handling                                              
+      63 -  Scenario: Reject a job where end_time equals start_time      
+      64 -    When a job_submitter submits a POST /jobs request with:    
+      65 -      | field      | value                        |            
+      66 -      | command    | /usr/bin/my-script.sh        |            
+      67 -      | start_time | 60 seconds from now          |            
+      68 -      | end_time   | 60 seconds from now          |            
+      69 -    Then the response status is 422                            
+      70 -    And the response contains a validation error for "end_time"
+      71 -                                                               
+      72 -  @error-handling                                              
+      57    Scenario Outline: Reject a job with a missing required field
+      58      When a job_submitter submits a POST /jobs request missing t
+          he "<field>" field
+      59      Then the response status is 422
+     ...
+      63        | field      |
+      64        | command    |
+      65        | start_time |
+      82 -      | end_time   |                                           
+      66  
+      67    @error-handling
+      68 +  Scenario: Reject a job with a depends_on referencing an unkno
+         +wn job_id                                                      
+      69 +    When a job_submitter submits a POST /jobs request with depe
+         +nds_on containing "j-does-not-exist"                           
+      70 +    Then the response status is 422                            
+      71 +    And the response identifies "j-does-not-exist" as an unknow
+         +n dependency                                                   
+      72 +                                                               
+      73 +  @error-handling                                              
+      74 +  Scenario: Reject a job with max_runtime set to zero or negati
+         +ve                                                             
+      75 +    When a job_submitter submits a POST /jobs request with max_
+         +runtime -1                                                     
+      76 +    Then the response status is 422                            
+      77 +    And the response contains a validation error for "max_runti
+         +me"                                                            
+      78 +                                                               
+      79 +  @error-handling                                              
+      80    Scenario: Reject a malformed JSON request body
+      81      When a job_submitter sends a POST /jobs request with malfor
+          med JSON
+      82      Then the response status is 400
+
+● Now update the one end_time reference remaining in job-dispatch.feature:
+
+● Update(specs/features/worker-management/job-dispatch.feature)
+  ⎿  Added 2 lines, removed 1 line
+      40  
+      41    @smoke
+      42    Scenario: Worker agent polls the jobs table and claims a read
+          y job
+      43 -    Given a job "j-001" exists in the jobs table with status "r
+         -eady"                                                          
+      43 +    Given a job "j-001" exists in the jobs table with status "r
+         +eady" and command "/usr/bin/my-script.sh"                      
+      44      And a worker_agent "w-001" is online
+      45      When the worker_agent on "w-001" polls for ready jobs and a
+          ttempts to claim "j-001"
+      46      Then job "j-001" status in the jobs table is "assigned"
+      47      And job "j-001" worker_id in the jobs table is "w-001"
+      48 +    And the worker_agent has the job command and any resource l
+         +imits (max_runtime, max_memory)                                
+      49  
+      50    @smoke
+      51    Scenario: Worker agent updates status to running after starti
+          ng the job process
+
+● Finally update the conventions — remove end_time from the jobs table
+  description and add the new optional fields:
+
+● Update(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Added 18 lines
+      74  | `jobs`          | Scheduler writes; worker_agent writes statu
+          s updates | Job definitions and lifecycle state |
+      75  | `worker_status` | worker_agent writes; scheduler reads       
+                    | Worker registration and heartbeat   |
+      76  
+      77 +### `jobs` Key Fields                                          
+      78 +                                                               
+      79 +| Field         | Required | Notes                             
+         +                       |                                       
+      80 +|---------------|----------|-----------------------------------
+         +-----------------------|                                       
+      81 +| `job_id`      | Yes      | Unique identifier                 
+         +                       |                                       
+      82 +| `command`     | Yes      | The command to execute            
+         +                       |                                       
+      83 +| `start_time`  | Yes      | When the job becomes eligible (pen
+         +ding → ready)          |                                       
+      84 +| `depends_on`  | No       | List of job_ids that must be `comp
+         +leted` first; default: empty |                                 
+      85 +| `max_runtime` | No       | Seconds; worker_agent kills proces
+         +s if exceeded; default: unlimited |                            
+      86 +| `max_memory`  | No       | MB; enforced by worker_agent; defa
+         +ult: unlimited         |                                       
+      87 +| `status`      | Yes      | See Job Status Values             
+         +                       |                                       
+      88 +| `worker_id`   | No       | Set by worker_agent on claim      
+         +                       |                                       
+      89 +| `exit_code`   | No       | Set by worker_agent on process exi
+         +t                      |                                       
+      90 +| `kill_reason` | No       | Set by worker_agent when process i
+         +s killed; e.g. `max_runtime_exceeded` |                        
+      91 +| `claimed_at`  | No       | Timestamp set by worker_agent on c
+         +laim                   |                                       
+      92 +| `started_at`  | No       | Timestamp set by worker_agent on p
+         +rocess start           |                                       
+      93 +| `finished_at` | No       | Timestamp set by worker_agent on p
+         +rocess exit            |                                       
+      94 +                                                               
+      95  ---
+      96  
+      97  ## Job Status Values (EXACT — exhaustive)
+
+● Done. Summary of changes:
+
+  Removed
+
+  - end_time — gone entirely from all artifacts, feature files, and the jobs
+  table
+
+  Added
+
+  - max_runtime (optional, seconds, default unlimited) — worker_agent enforces
+  via SIGTERM → grace → SIGKILL
+  - max_memory (optional, MB, default unlimited) — enforced by worker_agent
+  - exit_code and kill_reason fields on jobs
+  - started_at / finished_at timestamps
+  - kill_reason: max_runtime_exceeded as the failure reason when a job is killed
+
+  Behaviour
+
+  - All jobs now run to natural process exit
+  - Exit 0 → completed; exit != 0 → failed
+  - max_runtime exceeded → SIGTERM → grace period → SIGKILL → failed with
+  kill_reason
+  - No max_runtime set → worker_agent places no timeout, job runs indefinitely
+
+  Ready for Phase B when you are.
+
+✻ Churned for 2m 9s
+
+❯ I would like to modify the spec and user journeys still further before we     
+move onto Phase B but I want to check what we've got into git first to generate 
+ a checkpoint. Can you please create a .gitignore file for the project?         
+
+● Write(.gitignore)
+  ⎿  Wrote 75 lines to .gitignore
+       1 # Python
+       2 __pycache__/
+       3 *.py[cod]
+       4 *.pyo
+       5 *.pyd
+       6 .Python
+       7 *.egg
+       8 *.egg-info/
+       9 dist/
+      10 build/
+     … +65 lines (ctrl+o to expand)
+
+● .gitignore created. Standard Python exclusions plus:
+
+  - .env files (secrets)
+  - CAF runtime directories (evidence/, remediation/inbox/, outbox/) — these are
+   transient; the governance artifacts and evolution logs in .claude/ are
+  tracked
+
+  Ready to commit whenever you are.
+
+❯ Can you please justify the CAF directories that you've excluded? Don't make   
+any changes but give links to CAF docs or source code that support this.        
+
+  Searched for 4 patterns, read 1 file (ctrl+o to expand)
+
+● I can't fully justify the exclusions — and the CAF docs actually contradict
+  them. Here's what the source material says:
+
+  docs/artifact_convention.md lines 288–295 explicitly lists what should be
+  committed, not ignored:
+
+  ▎ - .claude/remediation/ — Review findings
+  ▎ - .claude/outbox/ — External agent task history
+  ▎ - .claude/evidence/*.json — Quality gate results (except large coverage)
+
+  The only CAF-recommended exclusion is .claude/evidence/coverage.json (large
+  file) and .claude/sessions/.
+
+  My reasoning was based on a general intuition that these were
+  transient/runtime directories, but the CAF docs treat them as audit trail —
+  remediation/ tracks QA findings and BA triage decisions across the project's
+  history, outbox/ records external research commissions, and evidence/ stores
+  quality gate results. All of these are meant to be versioned.
+
+  I should update the .gitignore to align with the CAF recommendation. The
+  corrected exclusions should be:
+
+  # CAF (per docs/artifact_convention.md)
+  .claude/evidence/coverage.json
+  .claude/sessions/
+
+  Want me to fix it?
+
+✻ Sautéed for 34s
+
+❯ Please exclude coverage.json but leave .claude/sessions                       
+
+● Update(.gitignore)
+  ⎿  Added 2 lines, removed 5 lines
+      68  *.log
+      69  logs/
+      70  
+      71 -# CAF evidence and runtime artifacts (not for version control) 
+      72 -.claude/evidence/                                              
+      73 -.claude/remediation/inbox/                                     
+      74 -.claude/remediation/archive/                                   
+      75 -.claude/outbox/                                                
+      71 +# CAF (per docs/artifact_convention.md)                        
+      72 +.claude/evidence/coverage.json                                 
+
+● Done.

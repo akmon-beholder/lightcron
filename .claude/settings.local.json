@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/akmon/.claude/**)",
+      "Read(//home/akmon/.claude/devops/**)",
+      "Read(//home/akmon/dev/beholder/claude-agent-framework/examples/antigravity-skill/outbox-poller/**)",
+      "Read(//home/akmon/dev/beholder/claude-agent-framework/patterns/determinism/**)",
+      "Bash(cp ~/.claude/plugins/local/caf/examples/antigravity-skill/outbox-poller/SKILL.md /home/akmon/dev/beholder/lightcron/.agent/skills/outbox-poller/SKILL.md)",
+      "Bash(cp ~/.claude/plugins/local/caf/examples/antigravity-skill/outbox-poller/scripts/check_outbox.sh /home/akmon/dev/beholder/lightcron/.agent/skills/outbox-poller/scripts/check_outbox.sh)",
+      "Bash(chmod +x /home/akmon/dev/beholder/lightcron/.agent/skills/outbox-poller/scripts/check_outbox.sh)",
+      "Bash(cp ~/.claude/plugins/local/caf/patterns/determinism/ports.py /home/akmon/dev/beholder/lightcron/src/domain/ports/ports.py)",
+      "Bash(cp ~/.claude/plugins/local/caf/patterns/determinism/adapters.py /home/akmon/dev/beholder/lightcron/src/domain/ports/adapters.py)",
+      "Bash(cp ~/.claude/plugins/local/caf/patterns/determinism/fakes.py /home/akmon/dev/beholder/lightcron/src/domain/ports/fakes.py)",
+      "Bash(cp ~/.claude/plugins/local/caf/patterns/determinism/__init__.py /home/akmon/dev/beholder/lightcron/src/domain/ports/__init__.py)",
+      "WebSearch",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(sed -i -e 's/RunnerAgent/WorkerAgent/g' -e 's/runner_agent/worker_agent/g' -e 's/runner agent/worker agent/g' -e 's/Runner Agent/Worker Agent/g' -e 's/Runner agent/Worker agent/g' \"$f\")",
+      "Bash(done)"
+    ]
+  }
+}
