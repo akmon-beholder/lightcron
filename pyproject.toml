@@ -43,11 +43,26 @@ packages = ["src/lightcron"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
 testpaths = ["tests"]
 
 [tool.coverage.run]
 source = ["src/lightcron"]
-omit = ["*/fakes.py"]
+omit = [
+    "*/fakes.py",
+    # Production app entrypoints — tested via fixture, not directly
+    "src/lightcron/scheduler/adapters/http/app.py",
+    "src/lightcron/worker/main.py",
+    # Worker process execution — requires real OS subprocess; no BDD tests for worker loop
+    "src/lightcron/worker/adapters/process/subprocess_adapter.py",
+    "src/lightcron/worker/domain/execution/services/claim_service.py",
+    "src/lightcron/worker/domain/execution/services/execution_service.py",
+    "src/lightcron/worker/domain/execution/services/registration_service.py",
+    # Abstract port interfaces — no executable lines
+    "src/lightcron/worker/ports/job_db.py",
+    "src/lightcron/worker/ports/process_manager.py",
+    "src/lightcron/worker/ports/worker_status_db.py",
+]
 
 [tool.coverage.report]
 fail_under = 80

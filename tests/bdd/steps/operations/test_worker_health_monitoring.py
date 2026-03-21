@@ -1,17 +1,16 @@
-"""BDD step definitions for worker-health-monitoring.feature (J007)."""
+"""BDD step definitions for worker-health-monitoring.feature (J007).
+
+All step functions are synchronous (pytest-bdd 8 requirement).
+"""
 
 from __future__ import annotations
 
 from types import SimpleNamespace
-from uuid import UUID
 
-import pytest
-import sqlalchemy as sa
-from httpx import AsyncClient
 from pytest_bdd import given, parsers, scenario, then, when
-from sqlalchemy.ext.asyncio import AsyncEngine
+from starlette.testclient import TestClient
 
-from tests.bdd.conftest import insert_job, insert_worker
+from tests.bdd.conftest import db_run, insert_job, insert_worker
 
 FEATURE = "../../../../specs/features/operations/worker-health-monitoring.feature"
 
@@ -29,77 +28,47 @@ def test_no_workers_empty() -> None: ...
 def test_worker_running_job_count() -> None: ...
 
 
-# ── Background ────────────────────────────────────────────────────────────────
-
-@given("the Lightcron scheduler is running")
-def scheduler_running() -> None:
-    pass
-
-
 # ── Givens ────────────────────────────────────────────────────────────────────
 
 @given("workers are registered:")
-async def given_workers_registered(
-    ctx: SimpleNamespace, db_engine: AsyncEngine, step: object
-) -> None:
-    """Insert workers from a datatable with columns: worker_id, hostname, status."""
-    rows = step.datatable.rows[1:]  # type: ignore[attr-defined]
-    for row in rows:
+def given_workers_registered(ctx: SimpleNamespace, datatable: list) -> None:
+    """Insert workers from a datatable with columns: name, hostname, status."""
+    for row in datatable[1:]:
         name, hostname, status = row[0], row[1], row[2]
-        wid = await insert_worker(db_engine, hostname=hostname, status=status)
+        wid = db_run(insert_worker, hostname=hostname, status=status)
         ctx.worker_ids[name] = wid
         ctx.worker_ids[hostname] = wid
 
 
 @given(parsers.parse('a worker "{name}" with hostname "{hostname}" last sent a heartbeat 90 seconds ago'))
-async def given_worker_stale_90s(
-    name: str, hostname: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    wid = await insert_worker(
-        db_engine, hostname=hostname, status="offline", last_seen_offset_seconds=95
-    )
+def given_worker_stale_90s(name: str, hostname: str, ctx: SimpleNamespace) -> None:
+    wid = db_run(insert_worker, hostname=hostname, status="offline", last_seen_offset_seconds=95)
     ctx.worker_ids[name] = wid
     ctx.worker_ids[hostname] = wid
 
 
-@given("no workers are registered")
-async def given_no_workers(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    pass  # clean_tables ensures empty state
-
-
 @given(parsers.parse('a worker "{name}" with hostname "{hostname}" is online'))
-async def given_worker_online(
-    name: str, hostname: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    wid = await insert_worker(db_engine, hostname=hostname, status="online")
+def given_worker_online(name: str, hostname: str, ctx: SimpleNamespace) -> None:
+    wid = db_run(insert_worker, hostname=hostname, status="online")
     ctx.worker_ids[name] = wid
     ctx.worker_ids[hostname] = wid
 
 
 @given(parsers.parse('worker "{name}" has {count:d} running jobs'))
-async def given_worker_has_running_jobs(
-    name: str, count: int, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
+def given_worker_has_running_jobs(name: str, count: int, ctx: SimpleNamespace) -> None:
     wid = ctx.worker_ids[name]
     for _ in range(count):
-        await insert_job(db_engine, status="running", worker_id=wid)
+        db_run(insert_job, status="running", worker_id=wid)
 
 
 # ── Whens ─────────────────────────────────────────────────────────────────────
 
 @when("GET /workers is called")
-async def get_workers(ctx: SimpleNamespace, http_client: AsyncClient) -> None:
-    ctx.response = await http_client.get("/workers")
+def get_workers(ctx: SimpleNamespace, http_client: TestClient) -> None:
+    ctx.response = http_client.get("/workers")
 
 
 # ── Thens ─────────────────────────────────────────────────────────────────────
-
-@then(parsers.parse("the response status is {code:d}"))
-def assert_response_status(code: int, ctx: SimpleNamespace) -> None:
-    assert ctx.response.status_code == code, (
-        f"Expected {code}, got {ctx.response.status_code}: {ctx.response.text}"
-    )
-
 
 @then(parsers.parse("the response contains {count:d} workers"))
 def assert_worker_count(count: int, ctx: SimpleNamespace) -> None:

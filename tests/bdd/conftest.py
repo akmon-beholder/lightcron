@@ -1,26 +1,32 @@
 """Shared BDD test infrastructure.
 
 Provides:
-  - db_engine:     Real PostgreSQL engine for integration tests
-  - clean_tables:  Truncates jobs + worker_status between each scenario
+  - clean_tables:  Truncates jobs + worker_status between each scenario (sync)
   - ctx:           Per-scenario mutable state dict (shared between steps)
   - fake_health:   FakeWorkerHealthClient with configurable responses
-  - scheduler_app: Bare FastAPI app wired with test services (no background loops)
-  - http_client:   httpx.AsyncClient pointing at the scheduler app
-  - worker_db/job_db: Raw DB adapters for worker agent tests
+  - scheduler_app: Bare FastAPI app wired with test services (sync fixture, fresh engine per test)
+  - http_client:   Starlette TestClient pointing at the scheduler app (sync)
+  - db_run():      Sync helper — run an async DB coroutine with a fresh engine
+
+All fixtures are synchronous. pytest-bdd 8 calls step functions via a synchronous
+mechanism; async fixtures cause event loop mismatches. Instead:
+  - DB operations in steps use db_run() which calls asyncio.run() with a fresh engine.
+  - HTTP calls use TestClient (runs ASGI app in a background thread with its own event loop).
+  - Cleanup uses db_run() via clean_tables.
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
-from collections.abc import AsyncGenerator
+from collections.abc import Generator
 from types import SimpleNamespace
 from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
-from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from starlette.testclient import TestClient
 
 TEST_DB_URL = os.environ.get(
     "DATABASE_URL",
@@ -28,27 +34,36 @@ TEST_DB_URL = os.environ.get(
 )
 
 
-# ── Database ──────────────────────────────────────────────────────────────────
+# ── Sync DB helper ─────────────────────────────────────────────────────────────
 
-@pytest.fixture(scope="session")
-def anyio_backend() -> str:
-    return "asyncio"
-
-
-@pytest.fixture(scope="session")
-async def db_engine() -> AsyncGenerator[AsyncEngine, None]:
-    engine = create_async_engine(TEST_DB_URL)
-    yield engine
-    await engine.dispose()
+async def _with_engine(coro_fn, *args, **kwargs):
+    """Create a temp async engine, call coro_fn(engine, ...), dispose."""
+    engine = create_async_engine(TEST_DB_URL, pool_size=1, max_overflow=0)
+    try:
+        return await coro_fn(engine, *args, **kwargs)
+    finally:
+        await engine.dispose()
 
 
-@pytest.fixture(autouse=True)
-async def clean_tables(db_engine: AsyncEngine) -> AsyncGenerator[None, None]:
-    yield
-    async with db_engine.connect() as conn:
+def db_run(coro_fn, *args, **kwargs):
+    """Run an async DB helper synchronously (for use in sync step functions)."""
+    return asyncio.run(_with_engine(coro_fn, *args, **kwargs))
+
+
+# ── Cleanup ────────────────────────────────────────────────────────────────────
+
+async def _do_cleanup(engine: AsyncEngine) -> None:
+    async with engine.connect() as conn:
         async with conn.begin():
             await conn.execute(sa.text("DELETE FROM jobs"))
             await conn.execute(sa.text("DELETE FROM worker_status"))
+
+
+@pytest.fixture(autouse=True)
+def clean_tables() -> Generator[None, None]:
+    """Truncate jobs + worker_status after each scenario via a fresh engine."""
+    yield
+    db_run(_do_cleanup)
 
 
 # ── Per-scenario state ────────────────────────────────────────────────────────
@@ -92,10 +107,12 @@ def fake_health() -> FakeWorkerHealthClient:
 # ── Scheduler HTTP test app ────────────────────────────────────────────────────
 
 @pytest.fixture
-async def scheduler_app(db_engine: AsyncEngine, fake_health: FakeWorkerHealthClient):  # type: ignore[return]
-    """A bare FastAPI scheduler app with test services injected (no background loops)."""
-    from fastapi import FastAPI
+def scheduler_app(fake_health: FakeWorkerHealthClient) -> object:
+    """Bare FastAPI scheduler app with a fresh async engine per test (sync fixture)."""
+    from fastapi import FastAPI, Request
+    from fastapi.exceptions import RequestValidationError
     from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse
 
     from lightcron.scheduler.adapters.db.job_repo import PostgresJobRepository
     from lightcron.scheduler.adapters.db.worker_repo import PostgresWorkerRepository
@@ -106,11 +123,21 @@ async def scheduler_app(db_engine: AsyncEngine, fake_health: FakeWorkerHealthCli
     from lightcron.scheduler.domain.workers.services.worker_service import WorkerService
     from lightcron.shared.ports.determinism.adapters import SystemTimeAdapter, SystemUUIDAdapter
 
+    # Fresh engine per test — connections will be created in TestClient's thread event loop.
+    engine = create_async_engine(TEST_DB_URL)
+
     app = FastAPI(title="Lightcron Scheduler (test)")
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-    job_repo = PostgresJobRepository(db_engine)
-    worker_repo = PostgresWorkerRepository(db_engine)
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+        for error in exc.errors():
+            if error.get("type") == "json_invalid":
+                return JSONResponse(status_code=400, content={"detail": "Malformed JSON"})
+        return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+    job_repo = PostgresJobRepository(engine)
+    worker_repo = PostgresWorkerRepository(engine)
 
     app.state.job_service = JobService(job_repo, SystemTimeAdapter(), SystemUUIDAdapter())
     app.state.worker_service = WorkerService(worker_repo)
@@ -129,28 +156,12 @@ async def scheduler_app(db_engine: AsyncEngine, fake_health: FakeWorkerHealthCli
 
 
 @pytest.fixture
-async def http_client(scheduler_app) -> AsyncGenerator[AsyncClient, None]:  # type: ignore[return]
-    async with AsyncClient(
-        transport=ASGITransport(app=scheduler_app), base_url="http://test"
-    ) as client:
-        yield client
+def http_client(scheduler_app) -> TestClient:
+    """Synchronous Starlette TestClient wrapping the scheduler ASGI app."""
+    return TestClient(scheduler_app, raise_server_exceptions=True)
 
 
-# ── Raw DB helpers (worker agent tests) ───────────────────────────────────────
-
-@pytest.fixture
-def job_db(db_engine: AsyncEngine):  # type: ignore[return]
-    from lightcron.worker.adapters.db.job_db import AsyncpgJobDB
-    return AsyncpgJobDB(db_engine)
-
-
-@pytest.fixture
-def worker_status_db(db_engine: AsyncEngine):  # type: ignore[return]
-    from lightcron.worker.adapters.db.worker_status_db import AsyncpgWorkerStatusDB
-    return AsyncpgWorkerStatusDB(db_engine)
-
-
-# ── DB helper functions ────────────────────────────────────────────────────────
+# ── Async DB helper functions (used via db_run() in step definitions) ──────────
 
 async def insert_worker(
     engine: AsyncEngine,
@@ -164,7 +175,7 @@ async def insert_worker(
             row = await conn.execute(
                 sa.text("""
                     INSERT INTO worker_status (hostname, status, last_seen, registered_at)
-                    VALUES (:hostname, :status,
+                    VALUES (:hostname, CAST(:status AS worker_status_enum),
                             now() - :offset * interval '1 second',
                             now() - :offset * interval '1 second')
                     RETURNING worker_id
@@ -200,7 +211,7 @@ async def insert_job(
                     VALUES (
                         :command,
                         now() + :offset * interval '1 second',
-                        :status, :worker_id,
+                        CAST(:status AS job_status), :worker_id,
                         :exit_code, :depends_on, :max_runtime, :max_memory, :kill_reason,
                         CASE WHEN :status IN ('running','completed','failed','lost','cancelled') THEN now() - interval '5 seconds' ELSE NULL END,
                         CASE WHEN :status IN ('completed','failed') THEN now() ELSE NULL END

@@ -1,4 +1,7 @@
-"""BDD step definitions for schedule-job.feature (J001)."""
+"""BDD step definitions for schedule-job.feature (J001).
+
+All step functions are synchronous (pytest-bdd 8 requirement).
+"""
 
 from __future__ import annotations
 
@@ -7,12 +10,10 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from uuid import UUID
 
-import pytest
-from httpx import AsyncClient
 from pytest_bdd import given, parsers, scenario, then, when
-from sqlalchemy.ext.asyncio import AsyncEngine
+from starlette.testclient import TestClient
 
-from tests.bdd.conftest import insert_job
+from tests.bdd.conftest import db_run, insert_job
 
 FEATURE = "../../../../specs/features/job-management/schedule-job.feature"
 
@@ -29,7 +30,7 @@ def test_schedule_with_deps() -> None: ...
 @scenario(FEATURE, "Reject a job with a start_time in the past")
 def test_reject_past_start_time() -> None: ...
 
-@scenario(FEATURE, "Reject a job with a missing required field", example_converters={"field": str})
+@scenario(FEATURE, "Reject a job with a missing required field")
 def test_reject_missing_field() -> None: ...
 
 @scenario(FEATURE, "Reject a job with a depends_on referencing an unknown job_id")
@@ -45,20 +46,20 @@ def test_reject_malformed_json() -> None: ...
 # ── Givens ────────────────────────────────────────────────────────────────────
 
 @given(parsers.parse('a job "{name}" already exists'))
-async def given_job_exists(name: str, ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    job_id = await insert_job(db_engine, command="echo placeholder", status="pending")
+def given_job_exists(name: str, ctx: SimpleNamespace) -> None:
+    job_id = db_run(insert_job, command="echo placeholder", status="pending")
     ctx.job_ids[name] = job_id
 
 
 # ── Whens ─────────────────────────────────────────────────────────────────────
 
 @when("a job_submitter submits a POST /jobs request with:", target_fixture="response")
-async def submit_job_with_table(
+def submit_job_with_table(
     ctx: SimpleNamespace,
-    http_client: AsyncClient,
-    step: object,
+    http_client: TestClient,
+    datatable: list,
 ) -> object:
-    rows: dict[str, str] = {r["field"]: r["value"] for r in step.datatable.rows[1:]}  # type: ignore[attr-defined]
+    rows: dict[str, str] = {r[0]: r[1] for r in datatable[1:]}
 
     start_time_str = rows.get("start_time", "")
     if "from now" in start_time_str:
@@ -82,29 +83,28 @@ async def submit_job_with_table(
         dep_names = json.loads(rows["depends_on"])
         payload["depends_on"] = [str(ctx.job_ids[n]) for n in dep_names]
 
-    resp = await http_client.post("/jobs", json=payload)
+    resp = http_client.post("/jobs", json=payload)
     ctx.response = resp
     return resp
 
 
 @when(parsers.parse('a job_submitter submits a POST /jobs request missing the "{field}" field'))
-async def submit_job_missing_field(
-    field: str, ctx: SimpleNamespace, http_client: AsyncClient
+def submit_job_missing_field(
+    field: str, ctx: SimpleNamespace, http_client: TestClient
 ) -> None:
     future = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
     payload: dict[str, object] = {"command": "echo test", "start_time": future}
-    payload.pop(field, None)
     if field == "command":
         payload.pop("command", None)
     elif field == "start_time":
         payload.pop("start_time", None)
-    ctx.response = await http_client.post("/jobs", json=payload)
+    ctx.response = http_client.post("/jobs", json=payload)
 
 
 @when("a job_submitter submits a POST /jobs request with depends_on containing \"j-does-not-exist\"")
-async def submit_job_unknown_dep(ctx: SimpleNamespace, http_client: AsyncClient) -> None:
+def submit_job_unknown_dep(ctx: SimpleNamespace, http_client: TestClient) -> None:
     future = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
-    ctx.response = await http_client.post("/jobs", json={
+    ctx.response = http_client.post("/jobs", json={
         "command": "echo test",
         "start_time": future,
         "depends_on": ["00000000-0000-0000-0000-000000000000"],
@@ -112,9 +112,9 @@ async def submit_job_unknown_dep(ctx: SimpleNamespace, http_client: AsyncClient)
 
 
 @when("a job_submitter submits a POST /jobs request with max_runtime -1")
-async def submit_job_invalid_runtime(ctx: SimpleNamespace, http_client: AsyncClient) -> None:
+def submit_job_invalid_runtime(ctx: SimpleNamespace, http_client: TestClient) -> None:
     future = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
-    ctx.response = await http_client.post("/jobs", json={
+    ctx.response = http_client.post("/jobs", json={
         "command": "echo test",
         "start_time": future,
         "max_runtime": -1,
@@ -122,8 +122,8 @@ async def submit_job_invalid_runtime(ctx: SimpleNamespace, http_client: AsyncCli
 
 
 @when("a job_submitter sends a POST /jobs request with malformed JSON")
-async def submit_malformed_json(ctx: SimpleNamespace, http_client: AsyncClient) -> None:
-    ctx.response = await http_client.post(
+def submit_malformed_json(ctx: SimpleNamespace, http_client: TestClient) -> None:
+    ctx.response = http_client.post(
         "/jobs",
         content=b"{not valid json",
         headers={"Content-Type": "application/json"},
@@ -131,13 +131,6 @@ async def submit_malformed_json(ctx: SimpleNamespace, http_client: AsyncClient) 
 
 
 # ── Thens ─────────────────────────────────────────────────────────────────────
-
-@then(parsers.parse("the response status is {code:d}"))
-def assert_status(code: int, ctx: SimpleNamespace) -> None:
-    assert ctx.response.status_code == code, (
-        f"Expected {code}, got {ctx.response.status_code}: {ctx.response.text}"
-    )
-
 
 @then("the response contains a unique job_id")
 def assert_has_job_id(ctx: SimpleNamespace) -> None:

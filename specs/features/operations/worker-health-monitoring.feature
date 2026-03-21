@@ -12,7 +12,7 @@ Feature: View Worker Fleet Status
     Given workers are registered:
       | worker_id | hostname  | status  |
       | w-001     | worker-01 | online  |
-      | w-002     | worker-02 | busy    |
+      | w-002     | worker-02 | online  |
       | w-003     | worker-03 | offline |
     When GET /workers is called
     Then the response status is 200

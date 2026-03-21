@@ -21,7 +21,16 @@
       "Bash(do echo:*)",
       "Read(//home/akmon/dev/beholder/lightcron/**)",
       "Bash(grep -v \"^$\")",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(uv sync:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker ps:*)",
+      "Bash(sort echo:*)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron \\\\\n  uv run alembic upgrade head 2>&1)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron uv run python -m pytest tests/bdd/ -v --tb=short)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron uv run python -m pytest tests/bdd/steps/job_management/test_schedule_job.py::test_schedule_minimal_job tests/bdd/steps/job_management/test_cancel_job.py::test_cancel_pending tests/bdd/steps/worker_management/test_worker_registration.py::test_register_on_startup tests/bdd/steps/operations/test_worker_health_monitoring.py::test_no_workers_empty --tb=short -v)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron uv run python -m pytest tests/bdd/steps/job_management/test_schedule_job.py::test_schedule_minimal_job --tb=long -v)",
+      "Bash(grep -rn STEP_ARGUMENT_DATATABLEs*= /home/akmon/dev/beholder/lightcron/.venv/lib/python3.12/site-packages/pytest_bdd/)"
     ]
   }
 }

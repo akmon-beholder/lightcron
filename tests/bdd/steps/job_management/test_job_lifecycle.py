@@ -1,18 +1,18 @@
-"""BDD step definitions for job-lifecycle-completion.feature (J004)."""
+"""BDD step definitions for job-lifecycle-completion.feature (J004).
+
+All step functions are synchronous (pytest-bdd 8 requirement).
+"""
 
 from __future__ import annotations
 
-import signal
-from datetime import UTC, datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock
 
-import pytest
-from httpx import AsyncClient
+import sqlalchemy as sa
 from pytest_bdd import given, parsers, scenario, then, when
 from sqlalchemy.ext.asyncio import AsyncEngine
+from starlette.testclient import TestClient
 
-from tests.bdd.conftest import get_job_status, insert_job, insert_worker
+from tests.bdd.conftest import db_run, get_job_status, insert_job, insert_worker
 
 FEATURE = "../../../../specs/features/job-management/job-lifecycle-completion.feature"
 
@@ -36,33 +36,16 @@ def test_query_completed_job() -> None: ...
 def test_query_failed_job() -> None: ...
 
 
-# ── Background given ──────────────────────────────────────────────────────────
+# ── Async DB helpers ──────────────────────────────────────────────────────────
 
-@given('a worker_status row for "w-001" exists with status "online"')
-async def given_w001_online(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    wid = await insert_worker(db_engine, hostname="worker-01")
-    ctx.worker_ids["w-001"] = wid
-
-
-@given('a job "j-001" has status "running" with worker_id "w-001"')
-async def given_j001_running(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    wid = ctx.worker_ids.get("w-001")
-    job_id = await insert_job(db_engine, status="running", worker_id=wid)
-    ctx.job_ids["j-001"] = job_id
-
-
-# ── Worker agent simulation helpers ──────────────────────────────────────────
-
-async def _worker_update_job(
-    db_engine: AsyncEngine,
+async def _update_job_status(
+    engine: AsyncEngine,
     job_id: object,
     status: str,
     exit_code: int | None = None,
     kill_reason: str | None = None,
 ) -> None:
     """Simulate worker_agent writing a job status update with terminal guard."""
-    import sqlalchemy as sa
-
     set_parts = ["status = :status", "finished_at = now()"]
     params: dict[str, object] = {"job_id": str(job_id), "status": status}
     if exit_code is not None:
@@ -72,7 +55,7 @@ async def _worker_update_job(
         set_parts.append("kill_reason = :kill_reason")
         params["kill_reason"] = kill_reason
 
-    async with db_engine.connect() as conn:
+    async with engine.connect() as conn:
         async with conn.begin():
             await conn.execute(
                 sa.text(
@@ -84,6 +67,60 @@ async def _worker_update_job(
             )
 
 
+async def _set_max_runtime(engine: AsyncEngine, job_id: object, seconds: int) -> None:
+    async with engine.connect() as conn:
+        async with conn.begin():
+            await conn.execute(
+                sa.text("UPDATE jobs SET max_runtime = :rt WHERE job_id = :id"),
+                {"rt": seconds, "id": str(job_id)},
+            )
+
+
+async def _get_exit_code(engine: AsyncEngine, job_id: object) -> int | None:
+    async with engine.connect() as conn:
+        row = await conn.execute(
+            sa.text("SELECT exit_code FROM jobs WHERE job_id = :id"),
+            {"id": str(job_id)},
+        )
+        result = row.fetchone()
+    return result.exit_code if result else None
+
+
+async def _get_finished_at(engine: AsyncEngine, job_id: object) -> object:
+    async with engine.connect() as conn:
+        row = await conn.execute(
+            sa.text("SELECT finished_at FROM jobs WHERE job_id = :id"),
+            {"id": str(job_id)},
+        )
+        result = row.fetchone()
+    return result.finished_at if result else None
+
+
+async def _get_kill_reason(engine: AsyncEngine, job_id: object) -> str | None:
+    async with engine.connect() as conn:
+        row = await conn.execute(
+            sa.text("SELECT kill_reason FROM jobs WHERE job_id = :id"),
+            {"id": str(job_id)},
+        )
+        result = row.fetchone()
+    return result.kill_reason if result else None
+
+
+# ── Background given ──────────────────────────────────────────────────────────
+
+@given('a worker_status row for "w-001" exists with status "online"')
+def given_w001_online(ctx: SimpleNamespace) -> None:
+    wid = db_run(insert_worker, hostname="worker-01")
+    ctx.worker_ids["w-001"] = wid
+
+
+@given('a job "j-001" has status "running" with worker_id "w-001"')
+def given_j001_running(ctx: SimpleNamespace) -> None:
+    wid = ctx.worker_ids.get("w-001")
+    job_id = db_run(insert_job, status="running", worker_id=wid)
+    ctx.job_ids["j-001"] = job_id
+
+
 # ── Whens ─────────────────────────────────────────────────────────────────────
 
 @when(parsers.parse('the job process for "j-001" exits with code {code:d}'))
@@ -92,34 +129,26 @@ def job_exits_with_code(code: int, ctx: SimpleNamespace) -> None:
 
 
 @when('the worker_agent on "w-001" updates the jobs table')
-async def worker_updates_table(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
+def worker_updates_table(ctx: SimpleNamespace) -> None:
     exit_code = ctx.exit_code
     status = "completed" if exit_code == 0 else "failed"
-    await _worker_update_job(db_engine, ctx.job_ids["j-001"], status, exit_code=exit_code)
+    db_run(_update_job_status, ctx.job_ids["j-001"], status, exit_code=exit_code)
 
 
 @given('job "j-001" has no max_runtime set')
-async def job_no_max_runtime(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
+def job_no_max_runtime(ctx: SimpleNamespace) -> None:
     pass  # insert_job defaults to max_runtime=None
 
 
 @when('the job process runs for an extended period and then exits with code 0')
-async def job_natural_exit(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    await _worker_update_job(db_engine, ctx.job_ids["j-001"], "completed", exit_code=0)
+def job_natural_exit(ctx: SimpleNamespace) -> None:
+    db_run(_update_job_status, ctx.job_ids["j-001"], "completed", exit_code=0)
     ctx.sigterm_sent = False
 
 
 @given(parsers.parse('job "j-001" has max_runtime set to {seconds:d} seconds'))
-async def job_with_max_runtime(
-    seconds: int, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    import sqlalchemy as sa
-    async with db_engine.connect() as conn:
-        async with conn.begin():
-            await conn.execute(
-                sa.text("UPDATE jobs SET max_runtime = :rt WHERE job_id = :id"),
-                {"rt": seconds, "id": str(ctx.job_ids["j-001"])},
-            )
+def job_with_max_runtime(seconds: int, ctx: SimpleNamespace) -> None:
+    db_run(_set_max_runtime, ctx.job_ids["j-001"], seconds)
 
 
 @given(parsers.parse("the job process has been running for {seconds:d} seconds without exiting"))
@@ -128,77 +157,55 @@ def job_running_too_long(seconds: int, ctx: SimpleNamespace) -> None:
 
 
 @when("the worker_agent detects max_runtime is exceeded")
-async def worker_detects_exceeded(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
+def worker_detects_exceeded(ctx: SimpleNamespace) -> None:
     ctx.sigterm_sent = True
-    # Simulate: SIGTERM sent, grace elapsed, SIGKILL, then DB write
-    await _worker_update_job(
-        db_engine,
-        ctx.job_ids["j-001"],
-        "failed",
-        kill_reason="max_runtime_exceeded",
-    )
+    db_run(_update_job_status, ctx.job_ids["j-001"], "failed", kill_reason="max_runtime_exceeded")
 
 
 @given('job "j-001" has status "completed" with exit_code 0, started_at, finished_at, and worker_id "w-001"')
-async def given_completed_job(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
+def given_completed_job(ctx: SimpleNamespace) -> None:
     wid = ctx.worker_ids.get("w-001")
     if wid is None:
-        wid = await insert_worker(db_engine, hostname="worker-01")
+        wid = db_run(insert_worker, hostname="worker-01")
         ctx.worker_ids["w-001"] = wid
-    job_id = await insert_job(db_engine, status="completed", worker_id=wid, exit_code=0)
+    job_id = db_run(insert_job, status="completed", worker_id=wid, exit_code=0)
     ctx.job_ids["j-001"] = job_id
 
 
 @given('job "j-001" has status "failed" with exit_code 2, started_at, finished_at, and worker_id "w-001"')
-async def given_failed_job(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
+def given_failed_job(ctx: SimpleNamespace) -> None:
     wid = ctx.worker_ids.get("w-001")
     if wid is None:
-        wid = await insert_worker(db_engine, hostname="worker-01")
+        wid = db_run(insert_worker, hostname="worker-01")
         ctx.worker_ids["w-001"] = wid
-    job_id = await insert_job(db_engine, status="failed", worker_id=wid, exit_code=2)
+    job_id = db_run(insert_job, status="failed", worker_id=wid, exit_code=2)
     ctx.job_ids["j-001"] = job_id
 
 
 @when("GET /jobs/j-001 is called")
-async def get_j001(ctx: SimpleNamespace, http_client: AsyncClient) -> None:
+def get_j001(ctx: SimpleNamespace, http_client: TestClient) -> None:
     job_id = ctx.job_ids["j-001"]
-    ctx.response = await http_client.get(f"/jobs/{job_id}")
+    ctx.response = http_client.get(f"/jobs/{job_id}")
 
 
 # ── Thens ─────────────────────────────────────────────────────────────────────
 
 @then(parsers.parse('job "j-001" status in the jobs table is "{status}"'))
-async def assert_j001_status(
-    status: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    actual = await get_job_status(db_engine, ctx.job_ids["j-001"])
+def assert_j001_status(status: str, ctx: SimpleNamespace) -> None:
+    actual = db_run(get_job_status, ctx.job_ids["j-001"])
     assert actual == status
 
 
 @then(parsers.parse('job "j-001" exit_code in the jobs table is {code:d}'))
-async def assert_j001_exit_code(
-    code: int, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    import sqlalchemy as sa
-    async with db_engine.connect() as conn:
-        row = await conn.execute(
-            sa.text("SELECT exit_code FROM jobs WHERE job_id = :id"),
-            {"id": str(ctx.job_ids["j-001"])},
-        )
-    result = row.fetchone()
-    assert result is not None and result.exit_code == code
+def assert_j001_exit_code(code: int, ctx: SimpleNamespace) -> None:
+    actual = db_run(_get_exit_code, ctx.job_ids["j-001"])
+    assert actual == code
 
 
 @then('job "j-001" finished_at is set')
-async def assert_finished_at_set(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    import sqlalchemy as sa
-    async with db_engine.connect() as conn:
-        row = await conn.execute(
-            sa.text("SELECT finished_at FROM jobs WHERE job_id = :id"),
-            {"id": str(ctx.job_ids["j-001"])},
-        )
-    result = row.fetchone()
-    assert result is not None and result.finished_at is not None
+def assert_finished_at_set(ctx: SimpleNamespace) -> None:
+    actual = db_run(_get_finished_at, ctx.job_ids["j-001"])
+    assert actual is not None
 
 
 @then("the worker_agent does not send SIGTERM during the run")
@@ -207,8 +214,8 @@ def assert_no_sigterm(ctx: SimpleNamespace) -> None:
 
 
 @then('job "j-001" status is "completed"')
-async def assert_j001_completed(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    actual = await get_job_status(db_engine, ctx.job_ids["j-001"])
+def assert_j001_completed(ctx: SimpleNamespace) -> None:
+    actual = db_run(get_job_status, ctx.job_ids["j-001"])
     assert actual == "completed"
 
 
@@ -223,17 +230,9 @@ def assert_sigkill_sent(ctx: SimpleNamespace) -> None:
 
 
 @then(parsers.parse('job "j-001" kill_reason is "{reason}"'))
-async def assert_kill_reason(
-    reason: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    import sqlalchemy as sa
-    async with db_engine.connect() as conn:
-        row = await conn.execute(
-            sa.text("SELECT kill_reason FROM jobs WHERE job_id = :id"),
-            {"id": str(ctx.job_ids["j-001"])},
-        )
-    result = row.fetchone()
-    assert result is not None and result.kill_reason == reason
+def assert_kill_reason(reason: str, ctx: SimpleNamespace) -> None:
+    actual = db_run(_get_kill_reason, ctx.job_ids["j-001"])
+    assert actual == reason
 
 
 @then(parsers.parse("the response contains exit_code {code:d}"))

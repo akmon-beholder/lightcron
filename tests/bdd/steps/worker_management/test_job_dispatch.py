@@ -1,17 +1,18 @@
-"""BDD step definitions for job-dispatch.feature (J003)."""
+"""BDD step definitions for job-dispatch.feature (J003).
+
+All step functions are synchronous (pytest-bdd 8 requirement).
+"""
 
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
+from uuid import UUID
 
-import pytest
 import sqlalchemy as sa
 from pytest_bdd import given, parsers, scenario, then, when
-from sqlalchemy.ext.asyncio import AsyncEngine
 
-from tests.bdd.conftest import get_job_status, insert_job, insert_worker
+from tests.bdd.conftest import db_run, get_job_status, get_worker_status, insert_job, insert_worker
 
 FEATURE = "../../../../specs/features/worker-management/job-dispatch.feature"
 
@@ -47,185 +48,42 @@ def test_ready_no_workers() -> None: ...
 def test_assigned_job_lost_on_heartbeat_expiry() -> None: ...
 
 
-# ── Background ────────────────────────────────────────────────────────────────
+# ── Async DB helpers ──────────────────────────────────────────────────────────
 
-@given("the Lightcron scheduler is running")
-def scheduler_running() -> None:
-    pass  # Scheduler services are wired in the test fixtures
-
-
-# ── Givens: scheduler/pending→ready ──────────────────────────────────────────
-
-@given(parsers.parse('a job "{name}" exists in the jobs table with status "pending", start_time of now, and no depends_on'))
-async def given_pending_job_no_deps(
-    name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    job_id = await insert_job(db_engine, status="pending", start_time_offset_seconds=0)
-    ctx.job_ids[name] = job_id
-
-
-@given(parsers.parse('a job "{name}" exists with status "pending", start_time of now, and depends_on ["{dep}"]'))
-async def given_pending_job_with_dep(
-    name: str, dep: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    dep_id = ctx.job_ids[dep]
-    job_id = await insert_job(
-        db_engine,
-        status="pending",
-        start_time_offset_seconds=0,
-        depends_on=[dep_id],
-    )
-    ctx.job_ids[name] = job_id
-
-
-@given(parsers.parse('a job "{name}" exists with status "{status}", start_time of now, and depends_on ["{dep}"]'))
-async def given_pending_job_dep_any_status(
-    name: str, status: str, dep: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    dep_id = ctx.job_ids[dep]
-    job_id = await insert_job(
-        db_engine,
-        status="pending",
-        start_time_offset_seconds=0,
-        depends_on=[dep_id],
-    )
-    ctx.job_ids[name] = job_id
-
-
-@given(parsers.parse('a job "{name}" exists with status "pending", start_time 60 seconds from now, and no depends_on'))
-async def given_pending_job_future_start(
-    name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    job_id = await insert_job(db_engine, status="pending", start_time_offset_seconds=60)
-    ctx.job_ids[name] = job_id
-
-
-@given(parsers.parse('a job "{name}" exists with status "{status}"'))
-async def given_job_with_any_status(
-    name: str, status: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    job_id = await insert_job(db_engine, status=status)
-    ctx.job_ids[name] = job_id
-
-
-# ── Givens: worker claiming ───────────────────────────────────────────────────
-
-@given(parsers.parse('a job "{name}" exists in the jobs table with status "ready" and command "{command}"'))
-async def given_ready_job_with_command(
-    name: str, command: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    job_id = await insert_job(db_engine, status="ready", command=command)
-    ctx.job_ids[name] = job_id
-
-
-@given(parsers.parse('a worker_agent "{name}" is online'))
-async def given_worker_online(
-    name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    wid = await insert_worker(db_engine, hostname=f"host-{name}")
-    ctx.worker_ids[name] = wid
-
-
-@given(parsers.parse('a job "{name}" has status "assigned" with worker_id "{worker}"'))
-async def given_assigned_job(
-    name: str, worker: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    wid = ctx.worker_ids.get(worker)
-    if wid is None:
-        wid = await insert_worker(db_engine, hostname=f"host-{worker}")
-        ctx.worker_ids[worker] = wid
-    job_id = await insert_job(db_engine, status="assigned", worker_id=wid)
-    ctx.job_ids[name] = job_id
-
-
-@given(parsers.parse('worker_agents "{w1}" and "{w2}" both attempt to claim "{name}" at the same time'))
-async def given_two_workers_ready_to_claim(
-    w1: str, w2: str, name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    wid1 = await insert_worker(db_engine, hostname=f"host-{w1}")
-    wid2 = await insert_worker(db_engine, hostname=f"host-{w2}")
-    ctx.worker_ids[w1] = wid1
-    ctx.worker_ids[w2] = wid2
-    # job already inserted by a prior given; if not, insert now
-    if name not in ctx.job_ids:
-        job_id = await insert_job(db_engine, status="ready")
-        ctx.job_ids[name] = job_id
-
-
-@given('no jobs in the jobs table have status "ready"')
-async def given_no_ready_jobs(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    pass  # clean_tables fixture guarantees empty state; no insert needed
-
-
-@given('no rows in worker_status have status "online"')
-async def given_no_online_workers(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    pass  # clean_tables guarantees empty state
-
-
-@given(parsers.parse('a job "{name}" exists with status "ready"'))
-async def given_ready_job(
-    name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    job_id = await insert_job(db_engine, status="ready")
-    ctx.job_ids[name] = job_id
-
-
-@given(parsers.parse('worker_status for "{name}" has last_seen 90 seconds ago'))
-async def given_worker_stale_90s(
-    name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    wid = ctx.worker_ids.get(name)
-    if wid is None:
-        wid = await insert_worker(db_engine, hostname=f"host-{name}", last_seen_offset_seconds=95)
-        ctx.worker_ids[name] = wid
-        return
-    async with db_engine.connect() as conn:
-        async with conn.begin():
-            await conn.execute(
-                sa.text(
-                    "UPDATE worker_status SET last_seen = now() - interval '95 seconds' "
-                    "WHERE worker_id = :id"
-                ),
-                {"id": str(wid)},
-            )
-
-
-# ── Whens ─────────────────────────────────────────────────────────────────────
-
-@when("the scheduler runs its ready-transition loop")
-async def run_ready_transition(db_engine: AsyncEngine) -> None:
+async def _run_ready_transition(engine) -> None:
     from lightcron.scheduler.adapters.db.job_repo import PostgresJobRepository
     from lightcron.scheduler.adapters.db.worker_repo import PostgresWorkerRepository
-    from lightcron.scheduler.adapters.health.worker_health_client import HttpWorkerHealthClient
+    from lightcron.scheduler.adapters.health.worker_health_client import HttpxWorkerHealthClient
     from lightcron.scheduler.domain.jobs.services.dispatch_service import DispatchService
     from lightcron.shared.ports.determinism.adapters import SystemTimeAdapter
 
-    job_repo = PostgresJobRepository(db_engine)
-    worker_repo = PostgresWorkerRepository(db_engine)
-    health_client = HttpWorkerHealthClient()
+    job_repo = PostgresJobRepository(engine)
+    worker_repo = PostgresWorkerRepository(engine)
+    health_client = HttpxWorkerHealthClient()
     service = DispatchService(job_repo, worker_repo, health_client, SystemTimeAdapter())
     await service._run_ready_transition_once()
 
 
-@when(parsers.parse('the worker_agent on "{name}" polls for ready jobs and attempts to claim "{job}"'))
-async def worker_claims_job(
-    name: str, job: str, ctx: SimpleNamespace, job_db: object
-) -> None:
-    wid = ctx.worker_ids[name]
-    job_id = ctx.job_ids[job]
-    claimed = await job_db.claim_job(wid)  # type: ignore[attr-defined]
-    ctx.claimed_job = claimed
+async def _run_health_check(engine, fake_health) -> None:
+    from lightcron.scheduler.adapters.db.job_repo import PostgresJobRepository
+    from lightcron.scheduler.adapters.db.worker_repo import PostgresWorkerRepository
+    from lightcron.scheduler.domain.jobs.services.dispatch_service import DispatchService
+    from lightcron.shared.ports.determinism.adapters import SystemTimeAdapter
+
+    job_repo = PostgresJobRepository(engine)
+    worker_repo = PostgresWorkerRepository(engine)
+    service = DispatchService(job_repo, worker_repo, fake_health, SystemTimeAdapter())  # type: ignore[arg-type]
+    await service._run_health_check_once()
 
 
-@when(parsers.parse('the worker_agent on "{name}" starts the job process'))
-def worker_starts_process(name: str, ctx: SimpleNamespace) -> None:
-    ctx.process_started = True
+async def _claim_job(engine, worker_id: UUID):
+    from lightcron.worker.adapters.db.job_db import AsyncpgJobDB
+    db = AsyncpgJobDB(engine)
+    return await db.claim_job(worker_id)
 
 
-@when("updates the jobs table")
-async def worker_updates_to_running(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
-    job_id = ctx.job_ids.get("j-001")
-    async with db_engine.connect() as conn:
+async def _update_to_running(engine, job_id: object) -> None:
+    async with engine.connect() as conn:
         async with conn.begin():
             await conn.execute(
                 sa.text(
@@ -236,31 +94,172 @@ async def worker_updates_to_running(ctx: SimpleNamespace, db_engine: AsyncEngine
             )
 
 
-@when("both atomic claim updates are executed")
-async def both_claims_executed(ctx: SimpleNamespace, db_engine: AsyncEngine) -> None:
+async def _set_worker_stale(engine, worker_id: UUID) -> None:
+    async with engine.connect() as conn:
+        async with conn.begin():
+            await conn.execute(
+                sa.text(
+                    "UPDATE worker_status SET last_seen = now() - interval '95 seconds' "
+                    "WHERE worker_id = :id"
+                ),
+                {"id": str(worker_id)},
+            )
+
+
+async def _both_claims(engine, wid1: UUID, wid2: UUID) -> list:
     from lightcron.worker.adapters.db.job_db import AsyncpgJobDB
-
-    job_db = AsyncpgJobDB(db_engine)
-    wid1 = ctx.worker_ids.get("w-001")
-    wid2 = ctx.worker_ids.get("w-002")
-
+    job_db = AsyncpgJobDB(engine)
     results = await asyncio.gather(
         job_db.claim_job(wid1),
         job_db.claim_job(wid2),
         return_exceptions=True,
     )
-    ctx.claim_results = results
+    return list(results)
+
+
+async def _query_job_worker_id(engine, job_id: object):
+    async with engine.connect() as conn:
+        row = await conn.execute(
+            sa.text("SELECT worker_id FROM jobs WHERE job_id = :id"),
+            {"id": str(job_id)},
+        )
+        return row.fetchone()
+
+
+# ── Givens: scheduler/pending→ready ──────────────────────────────────────────
+
+@given(parsers.parse('a job "{name}" exists in the jobs table with status "pending", start_time of now, and no depends_on'))
+def given_pending_job_no_deps(name: str, ctx: SimpleNamespace) -> None:
+    job_id = db_run(insert_job, status="pending", start_time_offset_seconds=0)
+    ctx.job_ids[name] = job_id
+
+
+@given(parsers.parse('a job "{name}" exists with status "pending", start_time of now, and depends_on ["{dep}"]'))
+def given_pending_job_with_dep(name: str, dep: str, ctx: SimpleNamespace) -> None:
+    dep_id = ctx.job_ids[dep]
+    job_id = db_run(insert_job, status="pending", start_time_offset_seconds=0, depends_on=[dep_id])
+    ctx.job_ids[name] = job_id
+
+
+@given(parsers.parse('a job "{name}" exists with status "{status}", start_time of now, and depends_on ["{dep}"]'))
+def given_pending_job_dep_any_status(name: str, status: str, dep: str, ctx: SimpleNamespace) -> None:
+    dep_id = ctx.job_ids[dep]
+    job_id = db_run(insert_job, status="pending", start_time_offset_seconds=0, depends_on=[dep_id])
+    ctx.job_ids[name] = job_id
+
+
+@given(parsers.parse('a job "{name}" exists with status "pending", start_time 60 seconds from now, and no depends_on'))
+def given_pending_job_future_start(name: str, ctx: SimpleNamespace) -> None:
+    job_id = db_run(insert_job, status="pending", start_time_offset_seconds=60)
+    ctx.job_ids[name] = job_id
+
+
+@given(parsers.parse('a job "{name}" exists with status "{status}"'))
+def given_job_with_any_status(name: str, status: str, ctx: SimpleNamespace) -> None:
+    job_id = db_run(insert_job, status=status)
+    ctx.job_ids[name] = job_id
+
+
+# ── Givens: worker claiming ───────────────────────────────────────────────────
+
+@given(parsers.parse('a job "{name}" exists in the jobs table with status "ready" and command "{command}"'))
+def given_ready_job_with_command(name: str, command: str, ctx: SimpleNamespace) -> None:
+    job_id = db_run(insert_job, status="ready", command=command)
+    ctx.job_ids[name] = job_id
+
+
+@given(parsers.parse('a worker_agent "{name}" is online'))
+def given_worker_online(name: str, ctx: SimpleNamespace) -> None:
+    wid = db_run(insert_worker, hostname=f"host-{name}")
+    ctx.worker_ids[name] = wid
+
+
+@given(parsers.parse('a job "{name}" has status "assigned" with worker_id "{worker}"'))
+def given_assigned_job(name: str, worker: str, ctx: SimpleNamespace) -> None:
+    wid = ctx.worker_ids.get(worker)
+    if wid is None:
+        wid = db_run(insert_worker, hostname=f"host-{worker}")
+        ctx.worker_ids[worker] = wid
+    job_id = db_run(insert_job, status="assigned", worker_id=wid)
+    ctx.job_ids[name] = job_id
+
+
+@given(parsers.parse('worker_agents "{w1}" and "{w2}" both attempt to claim "{name}" at the same time'))
+def given_two_workers_ready_to_claim(w1: str, w2: str, name: str, ctx: SimpleNamespace) -> None:
+    wid1 = db_run(insert_worker, hostname=f"host-{w1}")
+    wid2 = db_run(insert_worker, hostname=f"host-{w2}")
+    ctx.worker_ids[w1] = wid1
+    ctx.worker_ids[w2] = wid2
+    if name not in ctx.job_ids:
+        job_id = db_run(insert_job, status="ready")
+        ctx.job_ids[name] = job_id
+
+
+@given('no jobs in the jobs table have status "ready"')
+def given_no_ready_jobs(ctx: SimpleNamespace) -> None:
+    pass  # clean_tables fixture guarantees empty state
+
+
+@given('no rows in worker_status have status "online"')
+def given_no_online_workers(ctx: SimpleNamespace) -> None:
+    pass  # clean_tables guarantees empty state
+
+
+@given(parsers.parse('a job "{name}" exists with status "ready"'))
+def given_ready_job(name: str, ctx: SimpleNamespace) -> None:
+    job_id = db_run(insert_job, status="ready")
+    ctx.job_ids[name] = job_id
+
+
+@given(parsers.parse('worker_status for "{name}" has last_seen 90 seconds ago'))
+def given_worker_stale_90s(name: str, ctx: SimpleNamespace) -> None:
+    wid = ctx.worker_ids.get(name)
+    if wid is None:
+        wid = db_run(insert_worker, hostname=f"host-{name}", last_seen_offset_seconds=95)
+        ctx.worker_ids[name] = wid
+    else:
+        db_run(_set_worker_stale, wid)
+
+
+# ── Whens ─────────────────────────────────────────────────────────────────────
+
+@when("the scheduler runs its ready-transition loop")
+def run_ready_transition() -> None:
+    db_run(_run_ready_transition)
+
+
+@when(parsers.parse('the worker_agent on "{name}" polls for ready jobs and attempts to claim "{job}"'))
+def worker_claims_job(name: str, job: str, ctx: SimpleNamespace) -> None:
+    wid = ctx.worker_ids[name]
+    claimed = db_run(_claim_job, wid)
+    ctx.claimed_job = claimed
+
+
+@when(parsers.parse('the worker_agent on "{name}" starts the job process'))
+def worker_starts_process(name: str, ctx: SimpleNamespace) -> None:
+    ctx.process_started = True
+
+
+@when("updates the jobs table")
+def worker_updates_to_running(ctx: SimpleNamespace) -> None:
+    job_id = ctx.job_ids.get("j-001")
+    db_run(_update_to_running, job_id)
+
+
+@when("both atomic claim updates are executed")
+def both_claims_executed(ctx: SimpleNamespace) -> None:
+    wid1 = ctx.worker_ids.get("w-001")
+    wid2 = ctx.worker_ids.get("w-002")
+    ctx.claim_results = db_run(_both_claims, wid1, wid2)
 
 
 @when(parsers.parse('the worker_agent on "{name}" polls for ready jobs'))
-async def worker_polls_no_jobs(
-    name: str, ctx: SimpleNamespace, job_db: object
-) -> None:
+def worker_polls_no_jobs(name: str, ctx: SimpleNamespace) -> None:
     wid = ctx.worker_ids.get(name)
     if wid is None:
         from uuid import uuid4
         wid = uuid4()
-    claimed = await job_db.claim_job(wid)  # type: ignore[attr-defined]
+    claimed = db_run(_claim_job, wid)
     ctx.claimed_job = claimed
 
 
@@ -270,54 +269,31 @@ def time_passes(ctx: SimpleNamespace) -> None:
 
 
 @when("the scheduler runs its health check")
-async def run_health_check(
-    ctx: SimpleNamespace,
-    db_engine: AsyncEngine,
-    fake_health: object,
-) -> None:
-    from lightcron.scheduler.adapters.db.job_repo import PostgresJobRepository
-    from lightcron.scheduler.adapters.db.worker_repo import PostgresWorkerRepository
-    from lightcron.scheduler.domain.jobs.services.dispatch_service import DispatchService
-    from lightcron.shared.ports.determinism.adapters import SystemTimeAdapter
-
-    job_repo = PostgresJobRepository(db_engine)
-    worker_repo = PostgresWorkerRepository(db_engine)
-    service = DispatchService(job_repo, worker_repo, fake_health, SystemTimeAdapter())  # type: ignore[arg-type]
-    await service._run_health_check_once()
+def run_health_check(ctx: SimpleNamespace, fake_health: object) -> None:
+    db_run(_run_health_check, fake_health)
 
 
 # ── Thens ─────────────────────────────────────────────────────────────────────
 
 @then(parsers.parse('job "{name}" status in the jobs table is "{status}"'))
-async def assert_job_status_in_table(
-    name: str, status: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
+def assert_job_status_in_table(name: str, status: str, ctx: SimpleNamespace) -> None:
     job_id = ctx.job_ids[name]
-    actual = await get_job_status(db_engine, job_id)
+    actual = db_run(get_job_status, job_id)
     assert actual == status, f"Expected {status!r}, got {actual!r}"
 
 
 @then(parsers.parse('job "{name}" status remains "{status}"'))
-async def assert_job_status_remains(
-    name: str, status: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
+def assert_job_status_remains(name: str, status: str, ctx: SimpleNamespace) -> None:
     job_id = ctx.job_ids[name]
-    actual = await get_job_status(db_engine, job_id)
+    actual = db_run(get_job_status, job_id)
     assert actual == status, f"Expected job to remain {status!r}, got {actual!r}"
 
 
 @then(parsers.parse('job "{name}" worker_id in the jobs table is "{worker}"'))
-async def assert_job_worker_id(
-    name: str, worker: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
+def assert_job_worker_id(name: str, worker: str, ctx: SimpleNamespace) -> None:
     job_id = ctx.job_ids[name]
     expected_wid = ctx.worker_ids[worker]
-    async with db_engine.connect() as conn:
-        row = await conn.execute(
-            sa.text("SELECT worker_id FROM jobs WHERE job_id = :id"),
-            {"id": str(job_id)},
-        )
-        result = row.fetchone()
+    result = db_run(_query_job_worker_id, job_id)
     assert result is not None and str(result.worker_id) == str(expected_wid)
 
 
@@ -329,25 +305,16 @@ def assert_worker_has_job_details(ctx: SimpleNamespace) -> None:
 
 
 @then(parsers.parse('job "{name}" status is "assigned"'))
-async def assert_job_assigned(
-    name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
+def assert_job_assigned(name: str, ctx: SimpleNamespace) -> None:
     job_id = ctx.job_ids[name]
-    actual = await get_job_status(db_engine, job_id)
+    actual = db_run(get_job_status, job_id)
     assert actual == "assigned", f"Expected assigned, got {actual!r}"
 
 
 @then(parsers.parse('exactly one of "{w1}" or "{w2}" is recorded as worker_id'))
-async def assert_one_winner(
-    w1: str, w2: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
+def assert_one_winner(w1: str, w2: str, ctx: SimpleNamespace) -> None:
     job_id = ctx.job_ids.get("j-001")
-    async with db_engine.connect() as conn:
-        row = await conn.execute(
-            sa.text("SELECT worker_id FROM jobs WHERE job_id = :id"),
-            {"id": str(job_id)},
-        )
-        result = row.fetchone()
+    result = db_run(_query_job_worker_id, job_id)
     assert result is not None
     recorded = str(result.worker_id)
     wid1 = str(ctx.worker_ids[w1])
@@ -369,28 +336,21 @@ def assert_no_job_claimed(ctx: SimpleNamespace) -> None:
 
 
 @then(parsers.parse('job "{name}" status remains "ready"'))
-async def assert_job_remains_ready(
-    name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
+def assert_job_remains_ready(name: str, ctx: SimpleNamespace) -> None:
     job_id = ctx.job_ids[name]
-    actual = await get_job_status(db_engine, job_id)
+    actual = db_run(get_job_status, job_id)
     assert actual == "ready", f"Expected ready, got {actual!r}"
 
 
 @then(parsers.parse('job "{name}" status in the jobs table is "lost"'))
-async def assert_job_lost(
-    name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
+def assert_job_lost(name: str, ctx: SimpleNamespace) -> None:
     job_id = ctx.job_ids[name]
-    actual = await get_job_status(db_engine, job_id)
+    actual = db_run(get_job_status, job_id)
     assert actual == "lost", f"Expected lost, got {actual!r}"
 
 
 @then(parsers.parse('worker_status for "{name}" has status "offline"'))
-async def assert_worker_offline(
-    name: str, ctx: SimpleNamespace, db_engine: AsyncEngine
-) -> None:
-    from tests.bdd.conftest import get_worker_status
+def assert_worker_offline(name: str, ctx: SimpleNamespace) -> None:
     wid = ctx.worker_ids[name]
-    actual = await get_worker_status(db_engine, wid)
+    actual = db_run(get_worker_status, wid)
     assert actual == "offline", f"Expected offline, got {actual!r}"
