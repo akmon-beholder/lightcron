@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
@@ -64,10 +65,8 @@ async def test_skips_when_task_set_at_capacity() -> None:
     assert len(exe.jobs_run) == 0
 
     task.cancel()
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await task
-    except asyncio.CancelledError:
-        pass
 
 
 async def test_skips_when_db_count_at_capacity() -> None:

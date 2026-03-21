@@ -64,7 +64,7 @@ async def list_jobs(
             raise HTTPException(
                 status_code=422,
                 detail=[{"field": "status", "msg": f"'{status}' is not a valid job status"}],
-            )
+            ) from None
     jobs = await service.list_jobs(parsed_status)
     return [_job_to_response(j) for j in jobs]
 
@@ -80,7 +80,7 @@ async def cancel_job(
         raise HTTPException(
             status_code=409,
             detail="Job is in a terminal state and cannot be cancelled",
-        )
+        ) from None
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return CancelJobResponse(job_id=job.job_id, status=job.status)

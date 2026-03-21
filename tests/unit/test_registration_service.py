@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
@@ -64,10 +65,8 @@ async def test_heartbeat_survives_transient_db_error() -> None:
         await asyncio.sleep(0)
         await asyncio.sleep(0)
         task.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await task
-        except asyncio.CancelledError:
-            pass
 
     assert call_count >= 2  # loop ran past the exception
 
@@ -80,10 +79,8 @@ async def test_heartbeat_calls_update_last_seen() -> None:
     task = asyncio.create_task(svc.run_heartbeat_loop())
     await asyncio.sleep(0)  # yield so the loop runs its first iteration
     task.cancel()
-    try:
+    with contextlib.suppress(asyncio.CancelledError):
         await task
-    except asyncio.CancelledError:
-        pass
 
     assert len(db.last_seen_updates) >= 1
     assert db.last_seen_updates[0] == svc.worker_id

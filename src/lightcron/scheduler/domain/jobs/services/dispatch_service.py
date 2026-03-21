@@ -76,19 +76,18 @@ class DispatchService:
             await self._transition_pending_to_ready_sql(None)
             return
 
-        engine: AsyncEngine = repo._engine  # type: ignore[attr-defined]
-        async with engine.connect() as conn:
-            async with conn.begin():
-                # Try to acquire advisory lock (non-blocking)
-                lock_acquired = await conn.scalar(
-                    sa.text("SELECT pg_try_advisory_xact_lock(:key)"),
-                    {"key": _READY_TRANSITION_LOCK_KEY},
-                )
-                if not lock_acquired:
-                    logger.debug("Ready-transition: another scheduler holds the lock, skipping")
-                    return
+        engine: AsyncEngine = repo._engine
+        async with engine.connect() as conn, conn.begin():
+            # Try to acquire advisory lock (non-blocking)
+            lock_acquired = await conn.scalar(
+                sa.text("SELECT pg_try_advisory_xact_lock(:key)"),
+                {"key": _READY_TRANSITION_LOCK_KEY},
+            )
+            if not lock_acquired:
+                logger.debug("Ready-transition: another scheduler holds the lock, skipping")
+                return
 
-                await conn.execute(sa.text("""
+            await conn.execute(sa.text("""
                     UPDATE jobs
                     SET status = 'ready', updated_at = now()
                     WHERE status = 'pending'
@@ -164,24 +163,23 @@ class DispatchService:
             worker_repo, PostgresWorkerRepository
         ):
             # Execute both writes in a single transaction for atomicity
-            engine: AsyncEngine = job_repo._engine  # type: ignore[attr-defined]
-            async with engine.connect() as conn:
-                async with conn.begin():
-                    await conn.execute(
-                        sa.text(
-                            "UPDATE worker_status SET status = 'offline' "
-                            "WHERE worker_id = :id AND status = 'online'"
-                        ),
-                        {"id": str(worker_id)},
-                    )
-                    await conn.execute(
-                        sa.text(
-                            "UPDATE jobs SET status = 'lost', updated_at = now() "
-                            "WHERE worker_id = :id "
-                            "AND status IN ('assigned', 'running')"
-                        ),
-                        {"id": str(worker_id)},
-                    )
+            engine: AsyncEngine = job_repo._engine
+            async with engine.connect() as conn, conn.begin():
+                await conn.execute(
+                    sa.text(
+                        "UPDATE worker_status SET status = 'offline' "
+                        "WHERE worker_id = :id AND status = 'online'"
+                    ),
+                    {"id": str(worker_id)},
+                )
+                await conn.execute(
+                    sa.text(
+                        "UPDATE jobs SET status = 'lost', updated_at = now() "
+                        "WHERE worker_id = :id "
+                        "AND status IN ('assigned', 'running')"
+                    ),
+                    {"id": str(worker_id)},
+                )
         else:
             # Fallback for test fakes
             from uuid import UUID

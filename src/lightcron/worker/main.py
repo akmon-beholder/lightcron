@@ -46,7 +46,7 @@ async def main() -> None:
 
     # Build health API server config
     health_app = build_health_app()
-    health_config = uvicorn.Config(health_app, host="0.0.0.0", port=health_port, log_level="warning")
+    health_config = uvicorn.Config(health_app, host="0.0.0.0", port=health_port, log_level="warning")  # nosec B104
     health_server = uvicorn.Server(health_config)
 
     logger.info("Worker agent started — worker_id=%s concurrency=%d", worker_id, concurrency)

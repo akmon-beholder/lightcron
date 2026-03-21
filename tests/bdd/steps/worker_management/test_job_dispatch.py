@@ -83,27 +83,25 @@ async def _claim_job(engine, worker_id: UUID):
 
 
 async def _update_to_running(engine, job_id: object) -> None:
-    async with engine.connect() as conn:
-        async with conn.begin():
-            await conn.execute(
-                sa.text(
-                    "UPDATE jobs SET status = 'running', started_at = now(), updated_at = now() "
-                    "WHERE job_id = :id AND status NOT IN ('completed','failed','cancelled','lost')"
-                ),
-                {"id": str(job_id)},
-            )
+    async with engine.connect() as conn, conn.begin():
+        await conn.execute(
+            sa.text(
+                "UPDATE jobs SET status = 'running', started_at = now(), updated_at = now() "
+                "WHERE job_id = :id AND status NOT IN ('completed','failed','cancelled','lost')"
+            ),
+            {"id": str(job_id)},
+        )
 
 
 async def _set_worker_stale(engine, worker_id: UUID) -> None:
-    async with engine.connect() as conn:
-        async with conn.begin():
-            await conn.execute(
-                sa.text(
-                    "UPDATE worker_status SET last_seen = now() - interval '95 seconds' "
-                    "WHERE worker_id = :id"
-                ),
-                {"id": str(worker_id)},
-            )
+    async with engine.connect() as conn, conn.begin():
+        await conn.execute(
+            sa.text(
+                "UPDATE worker_status SET last_seen = now() - interval '95 seconds' "
+                "WHERE worker_id = :id"
+            ),
+            {"id": str(worker_id)},
+        )
 
 
 async def _both_claims(engine, wid1: UUID, wid2: UUID) -> list:
@@ -128,7 +126,7 @@ async def _query_job_worker_id(engine, job_id: object):
 
 # ── Givens: scheduler/pending→ready ──────────────────────────────────────────
 
-@given(parsers.parse('a job "{name}" exists in the jobs table with status "pending", start_time of now, and no depends_on'))
+@given(parsers.parse('a job "{name}" exists in the jobs table with status "pending", start_time of now, and no depends_on'))  # noqa: E501
 def given_pending_job_no_deps(name: str, ctx: SimpleNamespace) -> None:
     job_id = db_run(insert_job, status="pending", start_time_offset_seconds=0)
     ctx.job_ids[name] = job_id

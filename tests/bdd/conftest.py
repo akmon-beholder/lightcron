@@ -53,10 +53,9 @@ def db_run(coro_fn, *args, **kwargs):
 # ── Cleanup ────────────────────────────────────────────────────────────────────
 
 async def _do_cleanup(engine: AsyncEngine) -> None:
-    async with engine.connect() as conn:
-        async with conn.begin():
-            await conn.execute(sa.text("DELETE FROM jobs"))
-            await conn.execute(sa.text("DELETE FROM worker_status"))
+    async with engine.connect() as conn, conn.begin():
+        await conn.execute(sa.text("DELETE FROM jobs"))
+        await conn.execute(sa.text("DELETE FROM worker_status"))
 
 
 @pytest.fixture(autouse=True)
@@ -170,19 +169,18 @@ async def insert_worker(
     last_seen_offset_seconds: int = 0,
 ) -> UUID:
     """Insert a worker_status row and return the worker_id."""
-    async with engine.connect() as conn:
-        async with conn.begin():
-            row = await conn.execute(
-                sa.text("""
+    async with engine.connect() as conn, conn.begin():
+        row = await conn.execute(
+            sa.text("""
                     INSERT INTO worker_status (hostname, status, last_seen, registered_at)
                     VALUES (:hostname, CAST(:status AS worker_status_enum),
                             now() - :offset * interval '1 second',
                             now() - :offset * interval '1 second')
                     RETURNING worker_id
                 """),
-                {"hostname": hostname, "status": status, "offset": last_seen_offset_seconds},
-            )
-            return UUID(str(row.scalar_one()))
+            {"hostname": hostname, "status": status, "offset": last_seen_offset_seconds},
+        )
+        return UUID(str(row.scalar_one()))
 
 
 async def insert_job(
@@ -199,38 +197,38 @@ async def insert_job(
     kill_reason: str | None = None,
 ) -> UUID:
     """Insert a job row and return the job_id."""
-    async with engine.connect() as conn:
-        async with conn.begin():
-            row = await conn.execute(
-                sa.text("""
-                    INSERT INTO jobs (
-                        command, start_time, status, worker_id,
-                        exit_code, depends_on, max_runtime, max_memory, kill_reason,
-                        started_at, finished_at
-                    )
-                    VALUES (
-                        :command,
-                        now() + :offset * interval '1 second',
-                        CAST(:status AS job_status), :worker_id,
-                        :exit_code, :depends_on, :max_runtime, :max_memory, :kill_reason,
-                        CASE WHEN :status IN ('running','completed','failed','lost','cancelled') THEN now() - interval '5 seconds' ELSE NULL END,
-                        CASE WHEN :status IN ('completed','failed') THEN now() ELSE NULL END
-                    )
-                    RETURNING job_id
-                """),
-                {
-                    "command": command,
-                    "offset": start_time_offset_seconds,
-                    "status": status,
-                    "worker_id": str(worker_id) if worker_id else None,
-                    "exit_code": exit_code,
-                    "depends_on": [str(d) for d in (depends_on or [])],
-                    "max_runtime": max_runtime,
-                    "max_memory": max_memory,
-                    "kill_reason": kill_reason,
-                },
-            )
-            return UUID(str(row.scalar_one()))
+    async with engine.connect() as conn, conn.begin():
+        row = await conn.execute(
+            sa.text("""
+                INSERT INTO jobs (
+                    command, start_time, status, worker_id,
+                    exit_code, depends_on, max_runtime, max_memory, kill_reason,
+                    started_at, finished_at
+                )
+                VALUES (
+                    :command,
+                    now() + :offset * interval '1 second',
+                    CAST(:status AS job_status), :worker_id,
+                    :exit_code, :depends_on, :max_runtime, :max_memory, :kill_reason,
+                    CASE WHEN :status IN ('running','completed','failed','lost','cancelled')
+                        THEN now() - interval '5 seconds' ELSE NULL END,
+                    CASE WHEN :status IN ('completed','failed') THEN now() ELSE NULL END
+                )
+                RETURNING job_id
+            """),
+            {
+                "command": command,
+                "offset": start_time_offset_seconds,
+                "status": status,
+                "worker_id": str(worker_id) if worker_id else None,
+                "exit_code": exit_code,
+                "depends_on": [str(d) for d in (depends_on or [])],
+                "max_runtime": max_runtime,
+                "max_memory": max_memory,
+                "kill_reason": kill_reason,
+            },
+        )
+        return UUID(str(row.scalar_one()))
 
 
 async def get_job_status(engine: AsyncEngine, job_id: UUID) -> str | None:

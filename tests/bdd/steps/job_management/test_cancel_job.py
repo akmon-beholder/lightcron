@@ -90,10 +90,7 @@ def given_job_status_worker(name: str, status: str, worker: str, ctx: SimpleName
 @when(parsers.parse("POST /jobs/{name}/cancel is called"))
 def post_cancel(name: str, ctx: SimpleNamespace, http_client: TestClient) -> None:
     job_id = ctx.job_ids.get(name)
-    if job_id is None:
-        url = "/jobs/00000000-0000-0000-0000-000000000000/cancel"
-    else:
-        url = f"/jobs/{job_id}/cancel"
+    url = "/jobs/00000000-0000-0000-0000-000000000000/cancel" if job_id is None else f"/jobs/{job_id}/cancel"
     ctx.response = http_client.post(url)
 
 

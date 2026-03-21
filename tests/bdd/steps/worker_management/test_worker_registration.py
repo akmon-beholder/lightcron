@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from pytest_bdd import given, parsers, scenario, then, when
 from starlette.testclient import TestClient
 
-from tests.bdd.conftest import db_run, get_worker_status, insert_worker
+from tests.bdd.conftest import db_run, insert_worker
 
 FEATURE = "../../../../specs/features/worker-management/worker-registration.feature"
 
@@ -48,15 +48,14 @@ async def _update_last_seen(engine, worker_id: UUID) -> None:
 
 
 async def _set_last_seen_stale(engine, worker_id: UUID) -> None:
-    async with engine.connect() as conn:
-        async with conn.begin():
-            await conn.execute(
-                sa.text(
-                    "UPDATE worker_status SET last_seen = now() - interval '95 seconds' "
-                    "WHERE worker_id = :id"
-                ),
-                {"id": str(worker_id)},
-            )
+    async with engine.connect() as conn, conn.begin():
+        await conn.execute(
+            sa.text(
+                "UPDATE worker_status SET last_seen = now() - interval '95 seconds' "
+                "WHERE worker_id = :id"
+            ),
+            {"id": str(worker_id)},
+        )
 
 
 async def _run_health_check(engine, fake_health) -> None:
@@ -131,7 +130,7 @@ def set_last_seen_stale(name: str, ctx: SimpleNamespace) -> None:
     db_run(_set_last_seen_stale, wid)
 
 
-@given(parsers.parse('a worker_status row exists for hostname "{hostname}" with worker_id "{name}" and status "{status}"'))
+@given(parsers.parse('a worker_status row exists for hostname "{hostname}" with worker_id "{name}" and status "{status}"'))  # noqa: E501
 def given_worker_by_hostname(hostname: str, name: str, status: str, ctx: SimpleNamespace) -> None:
     wid = db_run(insert_worker, hostname=hostname, status=status)
     ctx.worker_ids[name] = wid

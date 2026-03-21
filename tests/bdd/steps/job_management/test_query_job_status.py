@@ -36,7 +36,7 @@ def test_invalid_filter() -> None: ...
 
 # ── Givens ────────────────────────────────────────────────────────────────────
 
-@given('a job "j-001" exists with status "running", command "/usr/bin/my-script.sh", start_time, end_time, and worker_id "w-001"')
+@given('a job "j-001" exists with status "running", command "/usr/bin/my-script.sh", start_time, end_time, and worker_id "w-001"')  # noqa: E501
 def given_running_job_with_worker(ctx: SimpleNamespace) -> None:
     wid = db_run(insert_worker, hostname="worker-01")
     ctx.worker_ids["w-001"] = wid

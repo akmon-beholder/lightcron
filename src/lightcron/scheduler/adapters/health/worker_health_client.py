@@ -12,7 +12,7 @@ class HttpxWorkerHealthClient:
 
     _TIMEOUT_SECONDS = 5.0
 
-    async def check_health(self, worker_id: UUID, address: str) -> bool:
+    async def check_health(self, _worker_id: UUID, address: str) -> bool:
         url = f"{address.rstrip('/')}/health"
         try:
             async with httpx.AsyncClient(timeout=self._TIMEOUT_SECONDS) as client:

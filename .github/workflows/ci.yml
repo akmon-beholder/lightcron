@@ -148,7 +148,8 @@ jobs:
       - run: pip install bandit pip-audit
 
       - name: Bandit SAST
-        run: bandit -r src/lightcron -ll
+        # B101: assert statements; B608: SQLAlchemy parameterised queries (false positive)
+        run: bandit -r src/lightcron -ll --skip B101,B608
 
       - name: pip-audit dependency scan
         run: pip-audit --requirement <(pip freeze)
