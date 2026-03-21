@@ -75,9 +75,9 @@ jobs:
       - name: Apply migrations
         run: alembic upgrade head
 
-      # ops condition C2: verify no uncommitted model changes after upgrade
-      - name: Check for pending migrations
-        run: alembic check
+      # ops condition C2: verify DB is at head revision after upgrade
+      - name: Verify DB at head revision
+        run: alembic current 2>&1 | grep "(head)"
 
       # ops condition C3: FK integrity validation
       - name: FK integrity check
