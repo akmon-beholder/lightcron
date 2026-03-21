@@ -59,6 +59,15 @@ Feature: View System State via Web UI Dashboard
     When the operator navigates to the dashboard page
     Then the jobs panel displays an empty state message
 
+  # ── Navigation to job detail ─────────────────────────────────────────────────
+
+  @smoke
+  Scenario: Clicking a job row navigates to the job detail page
+    Given a job "j-nav" in the jobs table has status "completed"
+    When the operator navigates to the dashboard page
+    And the operator clicks on the job row for "j-nav"
+    Then the browser navigates to the job detail page for "j-nav"
+
   # ── Auto-refresh ─────────────────────────────────────────────────────────────
 
   @smoke

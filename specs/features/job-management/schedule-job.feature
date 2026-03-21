@@ -80,3 +80,32 @@ Feature: Schedule a Job
   Scenario: Reject a malformed JSON request body
     When a job_submitter sends a POST /jobs request with malformed JSON
     Then the response status is 400
+
+  # ── env_vars ─────────────────────────────────────────────────────────────────
+
+  @smoke
+  Scenario: Successfully schedule a job with env_vars
+    When a job_submitter submits a POST /jobs request with:
+      | field      | value                        |
+      | command    | /usr/bin/my-script.sh        |
+      | start_time | 60 seconds from now          |
+      | env_vars   | {"APP_ENV": "staging", "LOG_LEVEL": "debug"} |
+    Then the response status is 201
+    And the response contains a unique job_id
+    And the job env_vars contains key "APP_ENV" with value "staging"
+    And the job env_vars contains key "LOG_LEVEL" with value "debug"
+
+  @smoke
+  Scenario: Job submitted without env_vars has an empty env_vars map
+    When a job_submitter submits a POST /jobs request with:
+      | field      | value                        |
+      | command    | /usr/bin/my-script.sh        |
+      | start_time | 60 seconds from now          |
+    Then the response status is 201
+    And the job env_vars is empty
+
+  @error-handling
+  Scenario: Reject a job with env_vars containing non-string values
+    When a job_submitter submits a POST /jobs request with env_vars containing a non-string value
+    Then the response status is 422
+    And the response contains a validation error for "env_vars"

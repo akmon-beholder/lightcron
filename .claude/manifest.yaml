@@ -2,9 +2,9 @@ schema_version: "2.0"
 project_slug: "lightcron"
 project_name: "Lightcron"
 created: "2026-03-20T00:00:00Z"
-last_updated: "2026-03-21T20:39:00Z"
+last_updated: "2026-03-21T00:00:00Z"
 lifecycle_mode: "lean"
-phase: "shipped"
+phase: "design"
 enforcement_log: ".claude/evolution/enforcement.log"
 
 artifact_versions:
@@ -13,6 +13,7 @@ artifact_versions:
   solution_envelope: "001_solution_envelope_v2.md"
   spec: "002_spec_v1.md"
   tasklist: "003_tasklist_v1.md"
+
 
 exclusive_permissions:
   write_backend_code: back

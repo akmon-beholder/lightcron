@@ -1,8 +1,8 @@
 # User Journeys — Lightcron
 
-**Version**: 1.1
+**Version**: 1.2
 **Created**: 2026-03-21
-**Updated**: 2026-03-21 — v1.1: added J009 (System Dashboard) and J010 (Schedule Job via UI)
+**Updated**: 2026-03-21 — v1.2: added J011 (Inspect Job Detail via Web UI); updated J001 with env_vars AC; updated dependency map and test coverage matrix
 **Agent**: design (Phase A)
 
 ---
@@ -42,7 +42,7 @@ As a job_submitter, I want to schedule a job with a start time and end time via 
 
 | Step | User Action                                      | System Response                                  | Success Criteria                        |
 |------|--------------------------------------------------|--------------------------------------------------|-----------------------------------------|
-| 1    | POST /jobs with command, start_time, and optional depends_on / max_runtime / max_memory | Validates payload; assigns job_id; stores as `pending` | HTTP 201, job_id returned |
+| 1    | POST /jobs with command, start_time, and optional depends_on / max_runtime / max_memory / env_vars | Validates payload; assigns job_id; stores as `pending` | HTTP 201, job_id returned |
 | 2    | (no action — scheduler background loop)          | When start_time reached AND all depends_on jobs are `completed`, scheduler marks job `ready` | Job status is `ready` |
 | 3    | GET /jobs/{job_id}                               | Returns current status                           | Status progresses through `ready` → `assigned` → `running` as worker_agents claim and start it |
 
@@ -56,6 +56,9 @@ As a job_submitter, I want to schedule a job with a start time and end time via 
 - **AC-J001-06**: Given a valid payload with max_runtime set to a positive integer (seconds), When POST /jobs is called, Then HTTP 201 is returned and max_runtime is stored against the job
 - **AC-J001-07**: Given a valid payload with max_memory set to a positive integer (MB), When POST /jobs is called, Then HTTP 201 is returned and max_memory is stored against the job
 - **AC-J001-08**: Given a valid payload with no max_runtime or max_memory, When POST /jobs is called, Then the job is created with both limits set to unlimited
+- **AC-J001-09**: Given a valid payload with an env_vars map (string keys and string values), When POST /jobs is called, Then HTTP 201 is returned and the env_vars map is stored against the job and will be passed to the subprocess at execution time
+- **AC-J001-10**: Given a valid payload with no env_vars field, When POST /jobs is called, Then the job is created with an empty env_vars map (the subprocess inherits the worker's environment without additions)
+- **AC-J001-11**: Given a payload with env_vars that is not a flat key-value map of strings (e.g. nested objects, non-string values), When POST /jobs is called, Then HTTP 422 is returned identifying the invalid env_vars format
 
 ### BDD Feature File
 
@@ -71,6 +74,7 @@ As a job_submitter, I want to schedule a job with a start time and end time via 
 | Invalid max_runtime    | max_runtime <= 0                   | HTTP 422, validation error      |
 | Invalid max_memory     | max_memory <= 0                    | HTTP 422, validation error      |
 | Malformed JSON         | Unparseable request body           | HTTP 400                        |
+| Invalid env_vars type  | env_vars is not a flat string map  | HTTP 422, validation error      |
 
 ---
 
@@ -398,7 +402,7 @@ As a platform_operator or job_submitter, I want to schedule a new job by filling
 
 | Step | User Action                                      | System Response                                  | Success Criteria                        |
 |------|--------------------------------------------------|--------------------------------------------------|-----------------------------------------|
-| 1    | Navigate to the "Schedule Job" page              | Form renders with fields: command, start_time, max_runtime (optional), max_memory (optional), depends_on (optional) | Form is usable |
+| 1    | Navigate to the "Schedule Job" page              | Form renders with fields: command, start_time, max_runtime (optional), max_memory (optional), depends_on (optional), env_vars (optional) | Form is usable |
 | 2    | Fill in the form and submit                      | UI POSTs to /jobs with the form data             | HTTP 201; job_id displayed; link to job detail shown |
 | 3    | Submit with invalid data                         | UI shows inline validation errors (client-side or from API 422 response) | User can correct and resubmit |
 
@@ -428,6 +432,73 @@ As a platform_operator or job_submitter, I want to schedule a new job by filling
 
 ---
 
+## Journey: J011 — Inspect Job Detail via Web UI
+
+**Priority**: P2
+**Lens**: Platform Operator / SRE / Job Submitter
+
+### User Story
+
+As a platform_operator or sre_operator, I want to click on a job in the dashboard and see its full detail — including stdout/stderr output, environment variables it ran with, its actual runtime, and peak memory usage — so that I can diagnose failures and verify job behaviour without database access.
+
+### Background
+
+This journey introduces four new data fields that must be stored in the `jobs` table and exposed on `GET /jobs/{job_id}`:
+
+- **`env_vars`**: a flat key-value map of strings submitted at schedule time (POST /jobs) and passed by the worker to the subprocess environment at execution time. Stored at creation; not mutated after submission.
+- **`stdout_output`**: the full captured stdout of the subprocess. Written by the worker_agent to the DB on job completion or termination (not streamed). NULL while the job is running or if the job produced no stdout.
+- **`stderr_output`**: the full captured stderr of the subprocess. Same capture and storage semantics as stdout_output.
+- **`peak_memory_mb`**: the highest RSS memory reading (in MB) observed by psutil during execution. Written by the worker_agent to the DB on job completion or termination. NULL before the job has started.
+
+Actual runtime is derived by the UI from `started_at` and `finished_at` and is not a separately stored field (unless the BA decides otherwise). If `finished_at` is NULL (job still running), the UI should display a live elapsed time derived from `started_at` and the current clock.
+
+### Flow Steps
+
+| Step | User Action                                           | System Response                                                                    | Success Criteria                                     |
+|------|-------------------------------------------------------|------------------------------------------------------------------------------------|------------------------------------------------------|
+| 1    | User is on the dashboard jobs panel; clicks on a job row | UI navigates to the job detail page at `/jobs/{job_id}` | Job detail page loads for that job_id              |
+| 2    | UI fetches GET /jobs/{job_id}                         | Scheduler returns the full job object, now including env_vars, stdout_output, stderr_output, peak_memory_mb | HTTP 200 with complete job record |
+| 3    | Detail page renders all job fields                    | UI displays: job_id, command, status (badge), start_time, started_at, finished_at, actual runtime, worker_id, exit_code, kill_reason (if set), depends_on list, max_runtime, max_memory, peak_memory_mb, env_vars table, stdout block, stderr block | All fields visible |
+| 4    | User inspects stdout/stderr output                    | UI renders stdout_output and stderr_output in separate read-only pre/code blocks with a scroll area | Output is readable; long output does not overflow the layout |
+| 5    | User inspects env_vars                                | UI renders env_vars as a two-column table (key / value); empty state shown if no env_vars were set | Env vars are easy to scan |
+| 6    | User navigates back to dashboard                      | Browser back button or a "Back to dashboard" link returns to `/`                  | Navigation works as expected                         |
+
+### Acceptance Criteria
+
+- **AC-J011-01**: Given a job_id that exists, When the user navigates to `/jobs/{job_id}` in the UI, Then the job detail page loads and displays the job's core fields: job_id, command, status, start_time, depends_on list, max_runtime, and max_memory
+- **AC-J011-02**: Given a completed job with started_at and finished_at both set, When the detail page is loaded, Then the UI displays the actual runtime computed from `finished_at - started_at` in a human-readable format (e.g. "2m 34s")
+- **AC-J011-03**: Given a running job with started_at set and finished_at NULL, When the detail page is loaded, Then the UI displays a live elapsed time counting up from started_at using the current local clock
+- **AC-J011-04**: Given a completed or failed job with peak_memory_mb set, When the detail page is loaded, Then the UI displays peak_memory_mb in megabytes (e.g. "128 MB")
+- **AC-J011-05**: Given a pending or assigned job (not yet started) where peak_memory_mb is NULL, When the detail page is loaded, Then the peak memory field shows a "not yet available" placeholder rather than a blank or error
+- **AC-J011-06**: Given a completed job with non-empty stdout_output, When the detail page is loaded, Then the stdout block renders the captured text in a read-only scrollable code block
+- **AC-J011-07**: Given a completed job with empty or NULL stdout_output, When the detail page is loaded, Then the stdout block shows a "No output" empty state message rather than a blank space
+- **AC-J011-08**: Given a completed job with non-empty stderr_output, When the detail page is loaded, Then the stderr block renders the captured text in a read-only scrollable code block, visually distinguished from stdout (e.g. different label or border colour)
+- **AC-J011-09**: Given a completed job with empty or NULL stderr_output, When the detail page is loaded, Then the stderr block shows a "No output" empty state message
+- **AC-J011-10**: Given a failed job with kill_reason set (e.g. `max_runtime_exceeded` or `max_memory_exceeded`), When the detail page is loaded, Then kill_reason is displayed prominently (e.g. as a warning banner above the output sections), and stderr_output is shown even if partial
+- **AC-J011-11**: Given a job whose env_vars map is non-empty, When the detail page is loaded, Then the UI renders the env_vars as a two-column key/value table
+- **AC-J011-12**: Given a job whose env_vars map is empty (no env_vars were submitted), When the detail page is loaded, Then the env_vars section shows a "No environment variables" empty state rather than a blank table
+- **AC-J011-13**: Given a job_id that does not exist in the scheduler, When the UI fetches GET /jobs/{job_id}, Then the detail page renders a clear "Job not found" error state with a link back to the dashboard
+- **AC-J011-14**: Given a running job, When the detail page is displayed, Then stdout_output, stderr_output, and peak_memory_mb all show a "job in progress" or "not yet available" placeholder (output is not streamed; it is only available after the job finishes)
+- **AC-J011-15**: Given the detail page is open and the auto-refresh interval elapses, Then the UI re-fetches GET /jobs/{job_id} and updates all displayed fields, so that a running job's status and live elapsed time stay current without a page reload
+- **AC-J011-16**: Given a job with env_vars submitted at schedule time, When the worker_agent claims and starts the job, Then the subprocess is launched with the env_vars merged into the worker's environment (worker base env vars plus the job's env_vars; job env_vars take precedence on key collision)
+
+### BDD Feature File
+
+**File**: `specs/features/ui/job-detail.feature`
+
+### Error Scenarios
+
+| Scenario                         | Trigger                                         | Expected Behaviour                                                               |
+|----------------------------------|-------------------------------------------------|----------------------------------------------------------------------------------|
+| Job not found                    | job_id in URL does not exist in DB              | Detail page shows "Job not found" error state with link back to dashboard        |
+| Job still running — no output    | stdout_output and stderr_output are NULL        | Output sections show "job in progress" placeholder; no error                    |
+| Job killed — partial stderr      | kill_reason set; stderr_output may be partial   | kill_reason shown as warning banner; stderr block shows partial content          |
+| No env_vars                      | env_vars is empty map                           | Env vars section shows "No environment variables" empty state                   |
+| Scheduler API unreachable        | GET /jobs/{job_id} returns network error        | Detail page shows generic "Could not load job" error with retry option           |
+| Output truncated at storage limit | stdout_output or stderr_output very large       | BA to decide on max storage size and truncation strategy; UI should indicate if truncation occurred |
+
+---
+
 ## Journey Dependency Map
 
 ```
@@ -441,36 +512,45 @@ J001 (Schedule Job)
   └── J005 (Cancel Job) — job must exist to be cancelled
   └── J006 (Query Status) — job must exist to query
   └── J010 (Schedule Job via UI) — UI wraps J001 REST call
+  └── J011 (Job Detail via UI) — job must exist and have run to show detail
 
 J007 (Worker Fleet Status) — requires J002
   └── J009 (System Dashboard) — UI wraps J006 + J007 REST calls
+        └── J011 (Job Detail via UI) — user navigates from dashboard job row to detail page
+
+J004 (Job Completion) — worker writes output and peak_memory_mb on completion
+  └── J011 (Job Detail via UI) — detail page shows output and memory stats from completed job
+
+J001 (Schedule Job with env_vars) — env_vars stored at creation
+  └── J011 (Job Detail via UI) — detail page shows env_vars from job record
 ```
 
 ---
 
 ## Test Coverage Matrix
 
-| Journey | Feature File                                          | pytest-bdd | playwright-bdd |
-|---------|-------------------------------------------------------|------------|----------------|
-| J001    | specs/features/job-management/schedule-job.feature    | Yes        | No (API-only)  |
-| J002    | specs/features/worker-management/worker-registration.feature | Yes | No (API-only) |
-| J003    | specs/features/worker-management/job-dispatch.feature | Yes        | No (API-only)  |
-| J004    | specs/features/job-management/job-lifecycle-completion.feature | Yes | No (API-only) |
-| J005    | specs/features/job-management/cancel-job.feature      | Yes        | No (API-only)  |
-| J006    | specs/features/job-management/query-job-status.feature | Yes       | No (API-only)  |
-| J007    | specs/features/operations/worker-health-monitoring.feature | Yes   | No (API-only)  |
-| J008    | specs/features/operations/stuck-job-recovery.feature  | Yes        | No (API-only)  |
-| J009    | specs/features/ui/system-dashboard.feature            | No         | Yes            |
-| J010    | specs/features/ui/schedule-job-ui.feature             | No         | Yes            |
+| Journey | Feature File                                                        | pytest-bdd | playwright-bdd |
+|---------|---------------------------------------------------------------------|------------|----------------|
+| J001    | specs/features/job-management/schedule-job.feature                  | Yes        | No (API-only)  |
+| J002    | specs/features/worker-management/worker-registration.feature        | Yes        | No (API-only)  |
+| J003    | specs/features/worker-management/job-dispatch.feature               | Yes        | No (API-only)  |
+| J004    | specs/features/job-management/job-lifecycle-completion.feature      | Yes        | No (API-only)  |
+| J005    | specs/features/job-management/cancel-job.feature                    | Yes        | No (API-only)  |
+| J006    | specs/features/job-management/query-job-status.feature              | Yes        | No (API-only)  |
+| J007    | specs/features/operations/worker-health-monitoring.feature          | Yes        | No (API-only)  |
+| J008    | specs/features/operations/stuck-job-recovery.feature                | Yes        | No (API-only)  |
+| J009    | specs/features/ui/system-dashboard.feature                          | No         | Yes            |
+| J010    | specs/features/ui/schedule-job-ui.feature                           | No         | Yes            |
+| J011    | specs/features/ui/job-detail.feature                                | No         | Yes            |
 
 ---
 
 ## Handoff to Phase B
 
 **Summary for Solution Design**:
-- Total Journeys: 10
+- Total Journeys: 11
 - P1 (Critical): J001, J002, J003, J004, J005, J006, J008
-- P2 (Important): J007, J009, J010
+- P2 (Important): J007, J009, J010, J011
 - Key Technical Implications:
   - Scheduler has two background loops: ready-transition (pending→ready) and health-check (worker liveness)
   - Worker agents pull and claim jobs from the DB — no push/assignment from the scheduler
@@ -479,5 +559,11 @@ J007 (Worker Fleet Status) — requires J002
   - Accepted trade-off: pull-based adds latency (poll interval) vs. push-based; acceptable for v1
   - Job process lifecycle (SIGTERM → grace → SIGKILL) owned by the worker_agent
   - All state lives in the database — ACID guarantees are critical for status transitions
-  - Web UI (J009, J010) is a React/TypeScript SPA; communicates with the scheduler REST API only; tested with Playwright
-- Suggested Implementation Order: J002 → J001 → J003 → J004 → J008 → J005 → J006 → J007 → J009 → J010
+  - Web UI (J009, J010, J011) is a React/TypeScript SPA; communicates with the scheduler REST API only; tested with Playwright
+  - **New (v1.2)**: `env_vars` is a flat key-value string map stored on the job at creation and passed by the worker_agent to the subprocess environment at execution time; displayed on the job detail page
+  - **New (v1.2)**: `stdout_output` and `stderr_output` are captured by the worker_agent at completion (not streamed) and stored in the DB; displayed on the job detail page in read-only scrollable blocks
+  - **New (v1.2)**: `peak_memory_mb` is the highest RSS reading observed during execution, written to the DB on job completion or termination by the worker_agent; displayed on the job detail page
+  - **New (v1.2)**: Actual runtime is derived in the UI from `started_at` / `finished_at`; no separate stored column unless BA decides otherwise
+  - **New (v1.2)**: The `jobs` table requires four new columns: `env_vars` (JSONB or HSTORE), `stdout_output` (TEXT NULL), `stderr_output` (TEXT NULL), `peak_memory_mb` (NUMERIC NULL); BA to decide column types and storage limits
+  - **New (v1.2)**: Output capture size limits and truncation strategy are an open question for BA — very large outputs could inflate DB row sizes; BA should define a max capture size and whether the UI should indicate truncation
+- Suggested Implementation Order: J002 → J001 → J003 → J004 → J008 → J005 → J006 → J007 → J009 → J010 → J011

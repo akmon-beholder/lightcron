@@ -30,6 +30,15 @@ Feature: Schedule a Job via Web UI Form
     Then the form submission succeeds
     And a job_id is displayed to the user
 
+  @smoke
+  Scenario: User submits a job with env_vars
+    Given the user enters command "/usr/bin/my-script.sh"
+    And the user enters a start_time 5 minutes from now
+    And the user enters env_vars "APP_ENV=staging, LOG_LEVEL=debug"
+    When the user submits the form
+    Then the form submission succeeds
+    And a job_id is displayed to the user
+
   # ── Client-side validation ───────────────────────────────────────────────────
 
   @error-handling
