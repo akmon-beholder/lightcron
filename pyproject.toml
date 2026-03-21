@@ -29,7 +29,7 @@ dev = [
     "lightcron[scheduler,worker]",
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
-    "pytest-bdd>=7.1",
+    "pytest-bdd>=8.0",
     "pytest-cov>=5.0",
     "ruff>=0.4",
     "mypy>=1.10",
@@ -53,11 +53,6 @@ omit = [
     # Production app entrypoints — tested via fixture, not directly
     "src/lightcron/scheduler/adapters/http/app.py",
     "src/lightcron/worker/main.py",
-    # Worker process execution — requires real OS subprocess; no BDD tests for worker loop
-    "src/lightcron/worker/adapters/process/subprocess_adapter.py",
-    "src/lightcron/worker/domain/execution/services/claim_service.py",
-    "src/lightcron/worker/domain/execution/services/execution_service.py",
-    "src/lightcron/worker/domain/execution/services/registration_service.py",
     # Abstract port interfaces — no executable lines
     "src/lightcron/worker/ports/job_db.py",
     "src/lightcron/worker/ports/process_manager.py",

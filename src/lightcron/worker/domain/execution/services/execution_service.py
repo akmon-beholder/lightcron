@@ -17,6 +17,9 @@ from lightcron.worker.ports.process_manager import ProcessManager
 
 logger = logging.getLogger(__name__)
 
+# Sub-second poll tick used during SIGTERM grace windows (not a spec-level constant)
+POLL_SLEEP_TIME_SECONDS: int = 1
+
 
 class ExecutionService:
     def __init__(self, db: JobDB, process_manager: ProcessManager) -> None:
@@ -123,13 +126,13 @@ class ExecutionService:
         # Wait for graceful exit during the grace period
         deadline = asyncio.get_event_loop().time() + SIGTERM_GRACE_PERIOD_SECONDS
         while asyncio.get_event_loop().time() < deadline:
-            await asyncio.sleep(1)
+            await asyncio.sleep(POLL_SLEEP_TIME_SECONDS)
             if self._pm.poll_exit(pid) is not None:
                 break
         else:
             # Grace period elapsed — force kill
             self._pm.kill_group(pid, signal.SIGKILL)
-            await asyncio.sleep(1)
+            await asyncio.sleep(POLL_SLEEP_TIME_SECONDS)
 
         finished_at = datetime.now(UTC)
         await self._db.update_status(
@@ -145,7 +148,7 @@ class ExecutionService:
         self._pm.kill_group(pid, signal.SIGTERM)
         deadline = asyncio.get_event_loop().time() + SIGTERM_GRACE_PERIOD_SECONDS
         while asyncio.get_event_loop().time() < deadline:
-            await asyncio.sleep(1)
+            await asyncio.sleep(POLL_SLEEP_TIME_SECONDS)
             if self._pm.poll_exit(pid) is not None:
                 return
         self._pm.kill_group(pid, signal.SIGKILL)
