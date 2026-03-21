@@ -1,0 +1,92 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: lightcron
+      POSTGRES_USER: lightcron
+      POSTGRES_PASSWORD: lightcron
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lightcron -d lightcron"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: lightcron
+      DB_USER: lightcron
+      DB_PASSWORD: lightcron
+      POOL_MODE: session
+      MAX_CLIENT_CONN: 100
+      DEFAULT_POOL_SIZE: 20
+      AUTH_TYPE: scram-sha-256
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "6432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U lightcron"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/scheduler/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+asyncpg://lightcron:lightcron@db:5432/lightcron
+      PGBOUNCER_URL: postgresql+asyncpg://lightcron:lightcron@pgbouncer:5432/lightcron
+      LIGHTCRON_UI_ORIGIN: http://localhost:5173
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker/Dockerfile
+    environment:
+      PGBOUNCER_URL: postgresql+asyncpg://lightcron:lightcron@pgbouncer:5432/lightcron
+      WORKER_CONCURRENCY: 2
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      scheduler:
+        condition: service_healthy
+    volumes:
+      - ./src:/app/src
+
+  ui:
+    image: node:20-alpine
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    volumes:
+      - ./frontend:/app
+    ports:
+      - "5173:5173"
+    profiles:
+      - ui
+
+volumes:
+  db_data:

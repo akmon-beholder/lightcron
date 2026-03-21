@@ -1,0 +1,668 @@
+╭─── Claude Code v2.1.81 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                 Welcome back Akmon!                │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ Recent activity         │
+│                        ▘▘ ▝▝                       │ No recent activity      │
+│ Sonnet 4.6 · Claude Pro · akmon@beholder.vision's  │                         │
+│ Organization                                       │                         │
+│              ~/dev/beholder/lightcron              │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+✻ Conversation compacted (ctrl+o for history)
+
+  ⎿  Referenced file .claude/artifacts/001_solution_envelope_v1.md
+  ⎿  Read .claude/manifest.yaml (38 lines)
+  ⎿  Read specs/features/operations/stuck-job-recovery.feature (109 lines)
+  ⎿  Read .claude/artifacts/008_shared_conventions_v2.md (268 lines)
+  ⎿  Read specs/features/worker-management/job-dispatch.feature (90 lines)
+
+● Phase B is complete. Ready to start the BA phase whenever you give the word —
+  the next artifacts are 002_spec_v1.md and 003_tasklist_v1.md.
+
+✻ Baked for 3m 49s
+
+❯ Looking at the solution envelope I see that it says 'no UI' I would like a    
+web UI where I can see the current state of the system along with a page to     
+manually schedule a job. Based on your understanding of CAF what is the best    
+way to approach this? Do I need to wait for a future run of CAF, can we go back 
+ to a previous step to add in that requirement or can it be added in at this    
+point? Do not make any changes, plesae just advise me of my options.            
+
+● You're at the ideal insertion point for this. BA hasn't started yet, so no
+  rework cascade is needed. Here are your options:
+
+  ---
+  Option A — Extend Phase A + B now (recommended)
+
+  Add new user journeys (e.g. J009: view system state, J010: schedule job via
+  UI) through the design agent, generate the corresponding .feature files, then
+  update the solution envelope to include a React frontend unit. BA then
+  produces a single spec + tasklist covering everything.
+
+  - Pros: Clean, single BA pass, no debt; BDD coverage for UI from day one; the
+  front agent (exclusive owner of frontend/) gets proper spec input
+  - Cons: Slightly more work before you get a tasklist
+
+  ---
+  Option B — Add to the solution envelope only, skip BDD
+
+  Amend 001_solution_envelope_v1.md to describe the frontend architecture and
+  have BA include UI tasks in the tasklist without going through Phase A again.
+
+  - Pros: Faster to get to code
+  - Cons: No BDD feature files for UI scenarios; CAF's front agent is supposed
+  to work from spec artifacts; you'd be cutting a corner the framework was
+  designed to prevent
+
+  ---
+  Option C — Defer to a second BA cycle
+
+  Proceed to BA now for the current 8 journeys, build the backend, then start a
+  second design + BA cycle for the UI on top of the existing system.
+
+  - Pros: Backend and frontend can be developed independently; clean separation
+  of concerns
+  - Cons: More coordination overhead; backend REST API shape may need to change
+  once UI requirements are known
+
+  ---
+  My recommendation: Option A. Since BA hasn't consumed the solution envelope
+  yet, extending Phase A + B costs one additional design pass but keeps
+  everything coherent — and the front agent needs feature files the same way the
+   back agent does. The UI requirements you've described (system state dashboard
+   + manual scheduling) are well-scoped enough to add quickly.
+
+  The only thing to confirm before starting: the solution envelope explicitly
+  said "no UI" — that was a design agent decision, not your instruction. So
+  there's nothing to undo, just extend.
+
+✻ Cooked for 32s
+
+❯ Ok thank you, please go for option A                                          
+
+  Read 2 files (ctrl+o to expand)
+
+● Good, I have everything I need. Here's my plan:
+
+  1. Add J009 + J010 to the user journeys artifact (version-bumped in-place)
+  2. Create two new BDD feature files under specs/features/ui/
+  3. Create 001_solution_envelope_v2.md with the frontend architecture added
+  4. Update 008_shared_conventions_v2.md to cover frontend conventions
+  5. Update manifest.yaml
+
+  Let me check what already exists in specs:
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+● Now I'll build everything. Starting with the user journeys update, the two
+  feature files, and the solution envelope update in parallel:
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 2 lines, removed 1 line
+      1  # User Journeys — Lightcron
+      2  
+      3 -**Version**: 1.0                                                
+      3 +**Version**: 1.1                                                
+      4  **Created**: 2026-03-21
+      5 +**Updated**: 2026-03-21 — v1.1: added J009 (System Dashboard) an
+        +d J010 (Schedule Job via UI)                                    
+      6  **Agent**: design (Phase A)
+      7  
+      8  ---
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 1 line
+      25  | Platform Operator   | Worker fleet management, job dispatch, 
+          no-downtime scaling | P1 |
+      26  | SRE / On-Call       | Fast incident diagnosis, cancel/force-s
+          top without DB access | P1 |
+      27  | System Admin        | API auth, worker identity, audit trail,
+           retention        | P2 |
+      28 +| Web UI User         | At-a-glance system health; submit jobs 
+         +without constructing raw HTTP requests | P2 |                  
+      29  
+      30  ---
+      31  
+
+● Now append J009 and J010 before the journey dependency map:
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 84 lines
+      344  
+      345  ---
+      346  
+      347 +## Journey: J009 — View System State via Web UI Dashboard     
+      348 +                                                              
+      349 +**Priority**: P2                                              
+      350 +**Lens**: Platform Operator / SRE                             
+      351 +                                                              
+      352 +### User Story                                                
+      353 +                                                              
+      354 +As a platform_operator or sre_operator, I want a web dashboard
+          + that shows the current state of the worker fleet and recent j
+          +obs so that I can assess system health without constructing RE
+          +ST API requests.                                              
+      355 +                                                              
+      356 +### Flow Steps                                                
+      357 +                                                              
+      358 +| Step | User Action                                      | Sy
+          +stem Response                                  | Success Crite
+          +ria                        |                                  
+      359 +|------|--------------------------------------------------|---
+          +-----------------------------------------------|--------------
+          +---------------------------|                                  
+      360 +| 1    | Navigate to the dashboard URL                    | UI
+          + fetches GET /workers and GET /jobs from the scheduler REST AP
+          +I | Dashboard renders worker fleet panel and jobs panel |     
+      361 +| 2    | Apply a status filter to the jobs panel          | UI
+          + fetches GET /jobs?status={filter}             | Jobs panel up
+          +dates to show only matching jobs |                            
+      362 +| 3    | (auto-refresh interval elapses)                  | UI
+          + re-fetches both endpoints                     | Panels reflec
+          +t latest state without a page reload |                        
+      363 +                                                              
+      364 +### Acceptance Criteria                                       
+      365 +                                                              
+      366 +- **AC-J009-01**: Given registered workers, When the dashboard
+          + is loaded, Then the worker fleet panel shows each worker's wo
+          +rker_id, hostname, status, last_seen, and count of running job
+          +s                                                             
+      367 +- **AC-J009-02**: Given an offline worker, When the dashboard 
+          +is loaded, Then that worker appears in the fleet panel with st
+          +atus `offline`                                                
+      368 +- **AC-J009-03**: Given jobs in the jobs table, When the dashb
+          +oard is loaded, Then the jobs panel shows each job's job_id, c
+          +ommand (truncated if long), status, and worker_id (if assigned
+          +)                                                             
+      369 +- **AC-J009-04**: Given the jobs panel is displaying jobs, Whe
+          +n the user selects a status filter, Then only jobs with that s
+          +tatus are shown                                               
+      370 +- **AC-J009-05**: Given the dashboard is open, When the auto-r
+          +efresh interval elapses, Then the UI re-fetches worker and job
+          + data and updates both panels without a full page reload      
+      371 +- **AC-J009-06**: Given no workers are registered, When the da
+          +shboard is loaded, Then the worker fleet panel shows a "no wor
+          +kers registered" empty state                                  
+      372 +- **AC-J009-07**: Given no jobs exist, When the dashboard is l
+          +oaded, Then the jobs panel shows a "no jobs" empty state      
+      373 +                                                              
+      374 +### BDD Feature File                                          
+      375 +                                                              
+      376 +**File**: `specs/features/ui/system-dashboard.feature`        
+      377 +                                                              
+      378 +### Error Scenarios                                           
+      379 +                                                              
+      380 +| Scenario              | Trigger                         | Ex
+          +pected Behaviour                               |              
+      381 +|-----------------------|---------------------------------|---
+          +-----------------------------------------------|              
+      382 +| No workers            | Empty worker_status table       | Em
+          +pty state message in worker fleet panel        |              
+      383 +| No jobs               | Empty jobs table                | Em
+          +pty state message in jobs panel                |              
+      384 +| Offline worker        | Worker last_seen > 90s          | Wo
+          +rker shown as `offline` in fleet panel         |              
+      385 +                                                              
+      386 +---                                                           
+      387 +                                                              
+      388 +## Journey: J010 — Schedule a Job via Web UI Form             
+      389 +                                                              
+      390 +**Priority**: P2                                              
+      391 +**Lens**: Platform Operator / Job Submitter                   
+      392 +                                                              
+      393 +### User Story                                                
+      394 +                                                              
+      395 +As a platform_operator or job_submitter, I want to schedule a 
+          +new job by filling in a form in the web UI so that I can submi
+          +t jobs without constructing raw HTTP requests.                
+      396 +                                                              
+      397 +### Flow Steps                                                
+      398 +                                                              
+      399 +| Step | User Action                                      | Sy
+          +stem Response                                  | Success Crite
+          +ria                        |                                  
+      400 +|------|--------------------------------------------------|---
+          +-----------------------------------------------|--------------
+          +---------------------------|                                  
+      401 +| 1    | Navigate to the "Schedule Job" page              | Fo
+          +rm renders with fields: command, start_time, max_runtime (opti
+          +onal), max_memory (optional), depends_on (optional) | Form is 
+          +usable |                                                      
+      402 +| 2    | Fill in the form and submit                      | UI
+          + POSTs to /jobs with the form data             | HTTP 201; job
+          +_id displayed; link to job detail shown |                     
+      403 +| 3    | Submit with invalid data                         | UI
+          + shows inline validation errors (client-side or from API 422 r
+          +esponse) | User can correct and resubmit |                    
+      404 +                                                              
+      405 +### Acceptance Criteria                                       
+      406 +                                                              
+      407 +- **AC-J010-01**: Given valid command and start_time, When the
+          + user submits the form, Then a job is created (HTTP 201) and t
+          +he job_id is displayed to the user                            
+      408 +- **AC-J010-02**: Given the user leaves command empty, When th
+          +e user submits, Then an inline validation error is shown on th
+          +e command field and the form is not submitted to the API      
+      409 +- **AC-J010-03**: Given the user enters a start_time in the pa
+          +st, When the user submits, Then an inline validation error is 
+          +shown on the start_time field                                 
+      410 +- **AC-J010-04**: Given the user enters a non-positive max_run
+          +time, When the user submits, Then an inline validation error i
+          +s shown on the max_runtime field                              
+      411 +- **AC-J010-05**: Given the user enters a non-positive max_mem
+          +ory, When the user submits, Then an inline validation error is
+          + shown on the max_memory field                                
+      412 +- **AC-J010-06**: Given valid form data including all optional
+          + fields (max_runtime, max_memory, depends_on), When the user s
+          +ubmits, Then the job is created with all fields stored        
+      413 +- **AC-J010-07**: Given the server returns a 422 error for an 
+          +unknown depends_on job_id, When the response is received, Then
+          + the UI displays the server error message inline              
+      414 +                                                              
+      415 +### BDD Feature File                                          
+      416 +                                                              
+      417 +**File**: `specs/features/ui/schedule-job-ui.feature`         
+      418 +                                                              
+      419 +### Error Scenarios                                           
+      420 +                                                              
+      421 +| Scenario                  | Trigger                         
+          +   | Expected Behaviour                              |        
+      422 +|---------------------------|---------------------------------
+          +---|-------------------------------------------------|        
+      423 +| Missing command           | command field empty             
+          +   | Inline validation error; no API call made       |        
+      424 +| Past start_time           | start_time < now                
+          +   | Inline validation error; no API call made       |        
+      425 +| Invalid max_runtime       | max_runtime ≤ 0                 
+          +   | Inline validation error; no API call made       |        
+      426 +| Invalid max_memory        | max_memory ≤ 0                  
+          +   | Inline validation error; no API call made       |        
+      427 +| Unknown depends_on        | Server returns 422              
+          +   | Server error displayed inline                   |        
+      428 +                                                              
+      429 +---                                                           
+      430 +                                                              
+      431  ## Journey Dependency Map
+      432  
+      433  ```
+
+● Now update the dependency map and test coverage matrix:
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 2 lines
+      440    └── J003 (Job Dispatch) — job must exist to be dispatched
+      441    └── J005 (Cancel Job) — job must exist to be cancelled
+      442    └── J006 (Query Status) — job must exist to query
+      443 +  └── J010 (Schedule Job via UI) — UI wraps J001 REST call    
+      444  
+      445  J007 (Worker Fleet Status) — requires J002
+      446 +  └── J009 (System Dashboard) — UI wraps J006 + J007 REST call
+          +s                                                             
+      447  ```
+      448  
+      449  ---
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 2 lines
+      460  | J006    | specs/features/job-management/query-job-status.fea
+           ture | Yes       | No (API-only)  |
+      461  | J007    | specs/features/operations/worker-health-monitoring
+           .feature | Yes   | No (API-only)  |
+      462  | J008    | specs/features/operations/stuck-job-recovery.featu
+           re  | Yes        | No (API-only)  |
+      463 +| J009    | specs/features/ui/system-dashboard.feature        
+          +    | No         | Yes            |                           
+      464 +| J010    | specs/features/ui/schedule-job-ui.feature         
+          +    | No         | Yes            |                           
+      465  
+      466  ---
+      467  
+
+● Now update the Handoff to Phase B summary:
+
+● Update(.claude/artifacts/000_user_journeys_v1.md)
+  ⎿  Added 4 lines, removed 3 lines
+      468  ## Handoff to Phase B
+      469  
+      470  **Summary for Solution Design**:
+      471 -- Total Journeys: 8                                           
+      471 +- Total Journeys: 10                                          
+      472  - P1 (Critical): J001, J002, J003, J004, J005, J006, J008
+      473 -- P2 (Important): J007                                        
+      473 +- P2 (Important): J007, J009, J010                            
+      474  - Key Technical Implications:
+      475    - Scheduler has two background loops: ready-transition (pend
+           ing→ready) and health-check (worker liveness)
+      476    - Worker agents pull and claim jobs from the DB — no push/as
+           signment from the scheduler
+     ...
+      479    - Accepted trade-off: pull-based adds latency (poll interval
+           ) vs. push-based; acceptable for v1
+      480    - Job process lifecycle (SIGTERM → grace → SIGKILL) owned by
+            the worker_agent
+      481    - All state lives in the database — ACID guarantees are crit
+           ical for status transitions
+      482 -- Suggested Implementation Order: J002 → J001 → J003 → J004 → 
+          -J008 → J005 → J006 → J007                                     
+      482 +  - Web UI (J009, J010) is a React/TypeScript SPA; communicate
+          +s with the scheduler REST API only; tested with Playwright    
+      483 +- Suggested Implementation Order: J002 → J001 → J003 → J004 → 
+          +J008 → J005 → J006 → J007 → J009 → J010                       
+
+● Now create the two BDD feature files:
+
+● Bash(mkdir -p /home/akmon/dev/beholder/lightcron/specs/features/ui)
+  ⎿  Done
+● Write(specs/features/ui/system-dashboard.feature)
+  ⎿  Wrote 70 lines to specs/features/ui/system-dashboard.feature
+      1 @J009 @P2 @persona:platform_operator @persona:sre_operator
+      2 Feature: View System State via Web UI Dashboard
+      3   As a platform_operator or sre_operator
+      4   I want to view the current state of the Lightcron system via a 
+        web dashboard
+      5   So that I can quickly assess worker health and job activity wit
+        hout using the REST API directly
+      6 
+      7   Background:
+      8     Given the Lightcron scheduler is running
+      9     And the web UI is accessible
+     … +60 lines (ctrl+o to expand)
+
+● Write(specs/features/ui/schedule-job-ui.feature)
+  ⎿  Wrote 79 lines to specs/features/ui/schedule-job-ui.feature
+       1 @J010 @P2 @persona:platform_operator @persona:job_submitter
+       2 Feature: Schedule a Job via Web UI Form
+       3   As a platform_operator or job_submitter
+       4   I want to schedule a new job by filling in a form in the web U
+         I
+       5   So that I can submit jobs without constructing raw HTTP reques
+         ts
+       6 
+       7   Background:
+       8     Given the Lightcron scheduler is running
+       9     And the web UI is accessible
+      10     And the user navigates to the "Schedule Job" page
+     … +69 lines (ctrl+o to expand)
+
+● Now create the solution envelope v2:
+
+● Write(.claude/artifacts/001_solution_envelope_v2.md)
+  ⎿  Wrote 484 lines to .claude/artifacts/001_solution_envelope_v2.md
+      1 # lightcron — Solution Envelope
+      2 
+      3 ## Metadata
+      4 - **Project Slug**: lightcron
+      5 - **Version**: v2
+      6 - **Created**: 2026-03-21
+      7 - **Updated**: 2026-03-21 — v2: added web UI (J009, J010); lightc
+        ron-ui deployable unit; frontend stack
+      8 - **Status**: ready_for_ba
+      9 - **Lifecycle Mode**: lean
+     … +474 lines (ctrl+o to expand)
+
+● Now update the shared conventions to cover the web UI persona and frontend
+  conventions:
+
+● Update(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Added 2 lines, removed 1 line
+       1  # Shared Conventions — Lightcron
+       2  
+       3 -**Version**: v3                                                
+       3 +**Version**: v5                                                
+       4  **Created**: 2026-03-21
+       5  **Updated**: 2026-03-21 — v2: corrected cancel from DELETE to P
+          OST; workers use DB-direct, not REST
+       6  **Updated**: 2026-03-21 — v3: two-stage worker liveness detecti
+          on (60s → /health probe, 90s → offline)
+       7  **Updated**: 2026-03-21 — v4: pull-based job claiming; added `r
+          eady` status; scheduler no longer assigns workers
+       8 +**Updated**: 2026-03-21 — v5: added web UI (J009, J010); web_ui
+         +_user persona; frontend conventions                            
+       9  **Agent**: design (Phase A)
+      10  **Purpose**: Single source of truth for naming, roles, threshol
+          ds, and patterns.
+      11               Every BDD generation agent receives this document 
+          verbatim.
+
+● Update(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Added 3 lines, removed 3 lines
+      47  
+      48  | Role                | Description                            
+                                       |
+      49  |---------------------|----------------------------------------
+          -----------------------------|
+      50 -| `job_submitter`     | Application developer calling the sched
+         -uler REST API to schedule/query/cancel jobs |                  
+      51 -| `platform_operator` | Engineer managing the Lightcron deploym
+         -ent and worker fleet         |                                 
+      52 -| `sre_operator`      | On-call engineer responding to incident
+         -s and managing running jobs  |                                 
+      50 +| `job_submitter`     | Application developer calling the sched
+         +uler REST API (or web UI) to schedule/query/cancel jobs |      
+      51 +| `platform_operator` | Engineer managing the Lightcron deploym
+         +ent and worker fleet; primary web UI user |                    
+      52 +| `sre_operator`      | On-call engineer responding to incident
+         +s; uses web UI dashboard for at-a-glance status |              
+      53  | `worker_agent`      | The process running on each worker node
+          ; reads/writes DB via pgBouncer; exposes `/health` |
+      54  | `scheduler`         | The Lightcron central service; owns the
+           REST API and background dispatch/health-check loops |
+      55  
+
+● Now append the frontend conventions section to the shared conventions file:
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(.claude/artifacts/008_shared_conventions_v2.md)
+  ⎿  Added 33 lines
+      256  
+      257  ---
+      258  
+      259 +---                                                           
+      260 +                                                              
+      261 +## Web UI Pages (EXACT — React Router routes)                 
+      262 +                                                              
+      263 +The web UI is a React/TypeScript SPA that communicates exclusi
+          +vely with the scheduler REST API.                             
+      264 +                                                              
+      265 +| Route        | Page Component     | Purpose                 
+          +                     |                                        
+      266 +|--------------|--------------------|-------------------------
+          +---------------------|                                        
+      267 +| `/`          | `DashboardPage`    | Worker fleet panel + job
+          +s panel (J009)       |                                        
+      268 +| `/jobs/new`  | `ScheduleJobPage`  | Job submission form (J01
+          +0)                   |                                        
+      269 +                                                              
+      270 +**Key rule**: The web UI ONLY calls the scheduler REST API pat
+          +hs listed in the Scheduler REST API Paths table above. It does
+          + not call worker REST APIs directly.                          
+      271 +                                                              
+      272 +---                                                           
+      273 +                                                              
+      274 +## Frontend Architecture (EXACT — Feature-Sliced Design layers
+          +)                                                             
+      275 +                                                              
+      276 +| Layer      | Purpose                                        
+          + | Examples                            |                      
+      277 +|------------|------------------------------------------------
+          +-|-------------------------------------|                      
+      278 +| `app/`     | Entry point, router, global providers          
+          + | React Query provider, Router        |                      
+      279 +| `pages/`   | Route-level components; compose widgets        
+          + | DashboardPage, ScheduleJobPage      |                      
+      280 +| `widgets/` | Standalone UI blocks composed from features/ent
+          +ities | WorkerFleetPanel, JobsPanel    |                      
+      281 +| `features/`| User-facing interactive behaviours             
+          + | ScheduleJobForm, StatusFilter       |                      
+      282 +| `entities/`| Business objects + their UI representations    
+          + | Job model + JobStatusBadge          |                      
+      283 +| `shared/`  | Reusable infrastructure; no business logic     
+          + | API client, useJobs, useWorkers     |                      
+      284 +                                                              
+      285 +**Import rule** (FSD): lower layers may NOT import from higher
+          + layers.                                                      
+      286 +`shared` ← `entities` ← `features` ← `widgets` ← `pages` ← `ap
+          +p`                                                            
+      287 +                                                              
+      288 +---                                                           
+      289 +                                                              
+      290  ## Anti-Patterns
+      291  
+      292  - Do NOT use DELETE for job cancellation — use POST /jobs/{job
+           _id}/cancel
+     ...
+      297  - Do NOT round numeric constants (last_seen timeout is 90s, no
+           t "about a minute")
+      298  - Do NOT assume authentication details — mark auth steps as `#
+            TODO: auth scheme TBD`
+      299  - If the spec is ambiguous, mark with `# SPEC-AMBIGUOUS: {what
+           's unclear}`
+      300 +- Do NOT have the web UI call worker REST APIs directly — it m
+          +ust go via the scheduler API                                  
+      301 +- Do NOT hardcode the scheduler API base URL in frontend code 
+          +— use an environment variable                                 
+
+● Finally, update the manifest:
+
+● Update(.claude/manifest.yaml)
+  ⎿  Added 1 line, removed 1 line
+      2  project_slug: "lightcron"
+      3  project_name: "Lightcron"
+      4  created: "2026-03-20T00:00:00Z"
+      5 -last_updated: "2026-03-20T00:00:00Z"                            
+      5 +last_updated: "2026-03-21T00:00:00Z"                            
+      6  lifecycle_mode: "lean"
+      7  phase: "build"
+      8  enforcement_log: ".claude/evolution/enforcement.log"
+
+● Update(.claude/manifest.yaml)
+  ⎿  Added 1 line, removed 1 line
+      10  artifact_versions:
+      11    user_journeys: "000_user_journeys_v1.md"
+      12    shared_conventions: "008_shared_conventions_v2.md"
+      13 -  solution_envelope: "001_solution_envelope_v1.md"             
+      13 +  solution_envelope: "001_solution_envelope_v2.md"             
+      14  
+      15  exclusive_permissions:
+      16    write_backend_code: back
+
+● Done. Here's a summary of everything that was produced:
+
+  New journeys (J009, J010) added to 000_user_journeys_v1.md (bumped to v1.1):
+  - J009: View System State via Web UI Dashboard — 7 ACs covering worker fleet
+  panel, jobs panel, status filter, auto-refresh, empty states
+  - J010: Schedule a Job via Web UI Form — 7 ACs covering happy path,
+  client-side validation (all 4 error cases), and server error passthrough
+
+  New BDD feature files:
+  - specs/features/ui/system-dashboard.feature — 7 scenarios (4 @smoke, 3
+  @error-handling)
+  - specs/features/ui/schedule-job-ui.feature — 7 scenarios (2 @smoke, 5
+  @error-handling)
+
+  Solution envelope v2 (001_solution_envelope_v2.md):
+  - lightcron-ui added as 3rd deployable unit (React 18 / TypeScript / Vite /
+  TanStack Query / React Router)
+  - Full FSD component map for the frontend
+  - F5 and F6 user flows added
+  - Two new ops conditions: C7 (CORS must be env-var configured, no wildcard in
+  prod), C8 (Playwright e2e in CI)
+  - Frontend task groups 12–16 added to BA handoff
+
+  Shared conventions v5 — web UI pages table, FSD layer map, frontend
+  anti-patterns added.
+
+  Ready for BA whenever you are.
+
+✻ Crunched for 6m 9s
+
+❯ That looks good. Please proceed with BA                                       
+
+  Read 1 file (ctrl+o to expand)
+
+● I have everything I need. Writing both BA artifacts now:
+
+● Write(.claude/artifacts/002_spec_v1.md)
+  ⎿  Wrote 605 lines to .claude/artifacts/002_spec_v1.md
+       1 # Lightcron — Functional Specification
+       2 
+       3 ## Metadata
+       4 - **Version**: v1
+       5 - **Created**: 2026-03-21
+       6 - **Agent**: ba (Phase B)
+       7 - **Inputs**: `001_solution_envelope_v2.md`, `000_user_journeys_
+         v1.md` (v1.1), `008_shared_conventions_v2.md` (v5)
+       8 - **Status**: approved_for_build
+       9 
+      10 ---
+     … +595 lines (ctrl+o to expand)
+
+● Now the tasklist:
+
+● Write(.claude/artifacts/003_tasklist_v1.md)
+  ⎿  Wrote 610 lines to .claude/artifacts/003_tasklist_v1.md
+       1 # Lightcron — Implementation Tasklist
+       2 
+       3 ## Metadata
+       4 - **Version**: v1
+       5 - **Created**: 2026-03-21
+       6 - **Agent**: ba (Phase B)
+       7 - **Inputs**: `002_spec_v1.md`, `001_solution_envelope_v2.md`
+       8 - **Status**: approved_for_build
+       9 
+      10 ---
+     … +600 lines (ctrl+o to expand)
+
+● Finally, update the manifest to record the new BA artifacts:
+
+  Read 1 file (ctrl+o to expand)
+
+● Update(.claude/manifest.yaml)
+  ⎿  Added 2 lines
+      11    user_journeys: "000_user_journeys_v1.md"
+      12    shared_conventions: "008_shared_conventions_v2.md"
+      13    solution_envelope: "001_solution_envelope_v2.md"
+      14 +  spec: "002_spec_v1.md"                                       
+      15 +  tasklist: "003_tasklist_v1.md"                               
+      16  
+      17  exclusive_permissions:
+      18    write_backend_code: back
+
+● BA phase complete. Here's what was produced:
+
+  ---
+  002_spec_v1.md — Full functional spec covering all 10 journeys:
+  - Constants module (all values from OQ resolutions)
+  - Exact PostgreSQL DDL for both tables including constraints and indexes
+  - All 5 REST endpoints with precise request/response shapes and validation
+  rules
+  - Ready-transition loop with advisory lock specification (multi-instance
+  safety)
+  - Health-check loop with the two-stage liveness SQL
+  - Complete worker agent behaviour: registration, heartbeat, claim (with
+  concurrency guard), execution, SIGTERM/SIGKILL logic, cancel detection, zombie
+   cleanup
+  - Web UI spec: dashboard auto-refresh, form validation rules, error handling
+  - 13 exhaustive policy rules
+  - 5 known limitations documented
+  - 8 quality gate conditions
+
+  003_tasklist_v1.md — 46 tasks across 16 groups:
+  - T001–T006: scaffold, Docker Compose, CI skeleton, migrations, pgBouncer
+  integration test, FK validation
+  - T007–T019: full scheduler (domain → ports → API → DB adapters → background
+  loops)
+  - T020–T030: full worker agent (domain → DB adapters → process manager → loops
+   → health API)
+  - T031–T035: BDD step definitions + CI pipeline (backend)
+  - T036–T042: full frontend (scaffold → entities → API hooks → dashboard →
+  schedule form → router)
+  - T043–T046: Playwright e2e tests + CI integration
+
+  Two parallel tracks are available once the scaffold is done: backend (Groups
+  3–14) and frontend (Groups 15–16, unblocked once T002 + T010 are complete).
+
+✻ Cooked for 4m 56s

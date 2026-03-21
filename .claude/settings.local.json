@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/akmon/.claude/**)",
+      "Read(//home/akmon/.claude/devops/**)",
+      "Read(//home/akmon/dev/beholder/claude-agent-framework/examples/antigravity-skill/outbox-poller/**)",
+      "Read(//home/akmon/dev/beholder/claude-agent-framework/patterns/determinism/**)",
+      "Bash(cp ~/.claude/plugins/local/caf/examples/antigravity-skill/outbox-poller/SKILL.md /home/akmon/dev/beholder/lightcron/.agent/skills/outbox-poller/SKILL.md)",
+      "Bash(cp ~/.claude/plugins/local/caf/examples/antigravity-skill/outbox-poller/scripts/check_outbox.sh /home/akmon/dev/beholder/lightcron/.agent/skills/outbox-poller/scripts/check_outbox.sh)",
+      "Bash(chmod +x /home/akmon/dev/beholder/lightcron/.agent/skills/outbox-poller/scripts/check_outbox.sh)",
+      "Bash(cp ~/.claude/plugins/local/caf/patterns/determinism/ports.py /home/akmon/dev/beholder/lightcron/src/domain/ports/ports.py)",
+      "Bash(cp ~/.claude/plugins/local/caf/patterns/determinism/adapters.py /home/akmon/dev/beholder/lightcron/src/domain/ports/adapters.py)",
+      "Bash(cp ~/.claude/plugins/local/caf/patterns/determinism/fakes.py /home/akmon/dev/beholder/lightcron/src/domain/ports/fakes.py)",
+      "Bash(cp ~/.claude/plugins/local/caf/patterns/determinism/__init__.py /home/akmon/dev/beholder/lightcron/src/domain/ports/__init__.py)",
+      "WebSearch",
+      "Bash(for f:*)",
+      "Bash(do)",
+      "Bash(sed -i -e 's/RunnerAgent/WorkerAgent/g' -e 's/runner_agent/worker_agent/g' -e 's/runner agent/worker agent/g' -e 's/Runner Agent/Worker Agent/g' -e 's/Runner agent/Worker agent/g' \"$f\")",
+      "Bash(done)",
+      "Bash(uv run:*)",
+      "Bash(do echo:*)",
+      "Read(//home/akmon/dev/beholder/lightcron/**)",
+      "Bash(grep -v \"^$\")",
+      "Bash(python:*)",
+      "Bash(uv sync:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker ps:*)",
+      "Bash(sort echo:*)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron \\\\\n  uv run alembic upgrade head 2>&1)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron uv run python -m pytest tests/bdd/ -v --tb=short)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron uv run python -m pytest tests/bdd/steps/job_management/test_schedule_job.py::test_schedule_minimal_job tests/bdd/steps/job_management/test_cancel_job.py::test_cancel_pending tests/bdd/steps/worker_management/test_worker_registration.py::test_register_on_startup tests/bdd/steps/operations/test_worker_health_monitoring.py::test_no_workers_empty --tb=short -v)",
+      "Bash(DATABASE_URL=postgresql+asyncpg://lightcron:lightcron@localhost:5432/lightcron uv run python -m pytest tests/bdd/steps/job_management/test_schedule_job.py::test_schedule_minimal_job --tb=long -v)",
+      "Bash(grep -rn STEP_ARGUMENT_DATATABLEs*= /home/akmon/dev/beholder/lightcron/.venv/lib/python3.12/site-packages/pytest_bdd/)"
+    ]
+  }
+}

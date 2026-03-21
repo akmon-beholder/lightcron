@@ -1,0 +1,39 @@
+schema_version: "2.0"
+project_slug: "lightcron"
+project_name: "Lightcron"
+created: "2026-03-20T00:00:00Z"
+last_updated: "2026-03-21T00:00:00Z"
+lifecycle_mode: "lean"
+phase: "build"
+enforcement_log: ".claude/evolution/enforcement.log"
+
+artifact_versions:
+  user_journeys: "000_user_journeys_v1.md"
+  shared_conventions: "008_shared_conventions_v2.md"
+  solution_envelope: "001_solution_envelope_v2.md"
+  spec: "002_spec_v1.md"
+  tasklist: "003_tasklist_v1.md"
+
+exclusive_permissions:
+  write_backend_code: back
+  write_frontend_code: front
+  execute_deployments: ops
+  define_user_journeys: design
+
+outstanding:
+  tasks: []
+  remediation: []
+
+reviews: {}
+
+fast_track:
+  enabled: true
+  criteria:
+    - single_file_change
+    - bug_fix_with_tests
+    - config_change
+    - documentation_update
+    - dependency_update
+    - minor_refactor
+  require_qa: true
+  max_files_changed: 3
