@@ -81,7 +81,7 @@ jobs:
 
       # ops condition C3: FK integrity validation
       - name: FK integrity check
-        run: psql "${{ env.DATABASE_URL }}" -f scripts/check_fk_integrity.sql
+        run: psql "postgresql://lightcron:lightcron@localhost:5432/lightcron" -f scripts/check_fk_integrity.sql
 
       - name: Run tests
         run: pytest --cov=src/lightcron --cov-report=xml --cov-fail-under=80

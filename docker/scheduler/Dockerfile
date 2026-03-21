@@ -6,4 +6,4 @@ COPY pyproject.toml .
 COPY src/ src/
 RUN pip install --no-cache-dir -e ".[scheduler]"
 
-CMD ["uvicorn", "lightcron.scheduler.adapters.http.app:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn lightcron.scheduler.adapters.http.app:app --host 0.0.0.0 --port 8000 --reload"]
