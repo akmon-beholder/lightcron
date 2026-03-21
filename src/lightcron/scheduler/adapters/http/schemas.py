@@ -7,7 +7,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
 # ── Requests ──────────────────────────────────────────────────────────────────
 
 class ScheduleJobRequest(BaseModel):

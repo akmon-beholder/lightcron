@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import os
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +18,8 @@ from lightcron.scheduler.adapters.http.workers_router import router as workers_r
 def _build_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
+        from sqlalchemy.ext.asyncio import create_async_engine
+
         from lightcron.scheduler.adapters.db.job_repo import PostgresJobRepository
         from lightcron.scheduler.adapters.db.worker_repo import PostgresWorkerRepository
         from lightcron.scheduler.adapters.health.worker_health_client import (
@@ -30,7 +32,6 @@ def _build_app() -> FastAPI:
             SystemTimeAdapter,
             SystemUUIDAdapter,
         )
-        from sqlalchemy.ext.asyncio import create_async_engine
 
         pgbouncer_url = os.environ["PGBOUNCER_URL"]
         engine = create_async_engine(pgbouncer_url)

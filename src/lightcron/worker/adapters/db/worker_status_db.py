@@ -14,27 +14,25 @@ class AsyncpgWorkerStatusDB:
 
     async def upsert_worker(self, hostname: str) -> UUID:
         """Upsert by hostname; preserve existing worker_id on conflict."""
-        async with self._engine.connect() as conn:
-            async with conn.begin():
-                row = await conn.execute(
-                    sa.text("""
+        async with self._engine.connect() as conn, conn.begin():
+            row = await conn.execute(
+                sa.text("""
                         INSERT INTO worker_status (hostname, status, last_seen, registered_at)
                         VALUES (:hostname, 'online', now(), now())
                         ON CONFLICT (hostname) DO UPDATE
                             SET status = 'online', last_seen = now()
                         RETURNING worker_id
                     """),
-                    {"hostname": hostname},
-                )
-                return UUID(str(row.scalar_one()))
+                {"hostname": hostname},
+            )
+            return UUID(str(row.scalar_one()))
 
     async def update_last_seen(self, worker_id: UUID) -> None:
-        async with self._engine.connect() as conn:
-            async with conn.begin():
-                await conn.execute(
-                    sa.text(
-                        "UPDATE worker_status SET last_seen = now() "
-                        "WHERE worker_id = :id"
-                    ),
-                    {"id": str(worker_id)},
-                )
+        async with self._engine.connect() as conn, conn.begin():
+            await conn.execute(
+                sa.text(
+                    "UPDATE worker_status SET last_seen = now() "
+                    "WHERE worker_id = :id"
+                ),
+                {"id": str(worker_id)},
+            )

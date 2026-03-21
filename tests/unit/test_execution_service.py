@@ -12,8 +12,6 @@ import signal
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
-import pytest
-
 from lightcron.worker.domain.execution.entities import JobExecution
 from lightcron.worker.domain.execution.services.execution_service import ExecutionService
 

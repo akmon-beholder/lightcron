@@ -55,25 +55,23 @@ async def _update_job_status(
         set_parts.append("kill_reason = :kill_reason")
         params["kill_reason"] = kill_reason
 
-    async with engine.connect() as conn:
-        async with conn.begin():
-            await conn.execute(
-                sa.text(
-                    f"UPDATE jobs SET {', '.join(set_parts)} "
-                    "WHERE job_id = :job_id "
-                    "AND status NOT IN ('completed','failed','cancelled','lost')"
-                ),
-                params,
-            )
+    async with engine.connect() as conn, conn.begin():
+        await conn.execute(
+            sa.text(
+                f"UPDATE jobs SET {', '.join(set_parts)} "
+                "WHERE job_id = :job_id "
+                "AND status NOT IN ('completed','failed','cancelled','lost')"
+            ),
+            params,
+        )
 
 
 async def _set_max_runtime(engine: AsyncEngine, job_id: object, seconds: int) -> None:
-    async with engine.connect() as conn:
-        async with conn.begin():
-            await conn.execute(
-                sa.text("UPDATE jobs SET max_runtime = :rt WHERE job_id = :id"),
-                {"rt": seconds, "id": str(job_id)},
-            )
+    async with engine.connect() as conn, conn.begin():
+        await conn.execute(
+            sa.text("UPDATE jobs SET max_runtime = :rt WHERE job_id = :id"),
+            {"rt": seconds, "id": str(job_id)},
+        )
 
 
 async def _get_exit_code(engine: AsyncEngine, job_id: object) -> int | None:

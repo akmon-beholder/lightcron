@@ -19,7 +19,6 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import create_async_engine
 
-
 PGBOUNCER_URL = os.environ.get("PGBOUNCER_URL", "")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 
@@ -36,26 +35,25 @@ async def _claim_one(url: str, job_id: str) -> bool:
     """
     engine = create_async_engine(url, poolclass=sa.pool.NullPool)
     try:
-        async with engine.connect() as conn:
-            async with conn.begin():
-                row = await conn.execute(
-                    sa.text(
-                        "SELECT job_id FROM jobs "
-                        "WHERE job_id = :id AND status = 'ready' "
-                        "FOR UPDATE SKIP LOCKED"
-                    ),
-                    {"id": job_id},
-                )
-                result = row.fetchone()
-                if result is None:
-                    return False
-                await conn.execute(
-                    sa.text(
-                        "UPDATE jobs SET status = 'assigned' WHERE job_id = :id"
-                    ),
-                    {"id": job_id},
-                )
-                return True
+        async with engine.connect() as conn, conn.begin():
+            row = await conn.execute(
+                sa.text(
+                    "SELECT job_id FROM jobs "
+                    "WHERE job_id = :id AND status = 'ready' "
+                    "FOR UPDATE SKIP LOCKED"
+                ),
+                {"id": job_id},
+            )
+            result = row.fetchone()
+            if result is None:
+                return False
+            await conn.execute(
+                sa.text(
+                    "UPDATE jobs SET status = 'assigned' WHERE job_id = :id"
+                ),
+                {"id": job_id},
+            )
+            return True
     finally:
         await engine.dispose()
 
@@ -63,24 +61,22 @@ async def _claim_one(url: str, job_id: str) -> bool:
 @pytest.fixture()
 async def ready_job(db_engine: sa.ext.asyncio.AsyncEngine) -> str:
     """Insert a single ready job and return its job_id."""
-    async with db_engine.connect() as conn:
-        async with conn.begin():
-            row = await conn.execute(
-                sa.text(
-                    "INSERT INTO jobs (command, start_time, status) "
-                    "VALUES ('echo test', now(), 'ready') "
-                    "RETURNING job_id"
-                )
+    async with db_engine.connect() as conn, conn.begin():
+        row = await conn.execute(
+            sa.text(
+                "INSERT INTO jobs (command, start_time, status) "
+                "VALUES ('echo test', now(), 'ready') "
+                "RETURNING job_id"
             )
-            job_id = str(row.scalar_one())
+        )
+        job_id = str(row.scalar_one())
     yield job_id
     # Cleanup
-    async with db_engine.connect() as conn:
-        async with conn.begin():
-            await conn.execute(
-                sa.text("DELETE FROM jobs WHERE job_id = :id"),
-                {"id": job_id},
-            )
+    async with db_engine.connect() as conn, conn.begin():
+        await conn.execute(
+            sa.text("DELETE FROM jobs WHERE job_id = :id"),
+            {"id": job_id},
+        )
 
 
 @pytest.fixture()
@@ -144,17 +140,16 @@ async def test_transaction_mode_simulation_demonstrates_unprotected_race(
         try:
             # Step 1: SELECT FOR UPDATE — connection released immediately after commit
             # (simulates what pgBouncer transaction mode does between statements)
-            async with engine.connect() as conn:
-                async with conn.begin():
-                    row = await conn.execute(
-                        sa.text(
-                            "SELECT job_id FROM jobs "
-                            "WHERE job_id = :id AND status = 'ready' "
-                            "FOR UPDATE SKIP LOCKED"
-                        ),
-                        {"id": job_id},
-                    )
-                    saw_job = row.fetchone() is not None
+            async with engine.connect() as conn, conn.begin():
+                row = await conn.execute(
+                    sa.text(
+                        "SELECT job_id FROM jobs "
+                        "WHERE job_id = :id AND status = 'ready' "
+                        "FOR UPDATE SKIP LOCKED"
+                    ),
+                    {"id": job_id},
+                )
+                saw_job = row.fetchone() is not None
             seen_in_select.append(saw_job)
             if not saw_job:
                 return False
@@ -163,16 +158,15 @@ async def test_transaction_mode_simulation_demonstrates_unprotected_race(
             await asyncio.sleep(0)
 
             # Step 2: UPDATE in a fresh connection — no lock held
-            async with engine.connect() as conn:
-                async with conn.begin():
-                    result = await conn.execute(
-                        sa.text(
-                            "UPDATE jobs SET status = 'assigned' "
-                            "WHERE job_id = :id AND status = 'ready'"
-                        ),
-                        {"id": job_id},
-                    )
-                    return result.rowcount > 0
+            async with engine.connect() as conn, conn.begin():
+                result = await conn.execute(
+                    sa.text(
+                        "UPDATE jobs SET status = 'assigned' "
+                        "WHERE job_id = :id AND status = 'ready'"
+                    ),
+                    {"id": job_id},
+                )
+                return result.rowcount > 0
         finally:
             await engine.dispose()
 

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from lightcron.scheduler.domain.jobs.entities import Job, JobStatus
-from lightcron.scheduler.ports.job_repository import JobRepository
 
 _TERMINAL_STATUSES = ("completed", "failed", "cancelled", "lost")
 
@@ -54,10 +52,9 @@ class PostgresJobRepository:
         return _row_to_job(result) if result else None
 
     async def save(self, job: Job) -> Job:
-        async with self._engine.connect() as conn:
-            async with conn.begin():
-                row = await conn.execute(
-                    sa.text("""
+        async with self._engine.connect() as conn, conn.begin():
+            row = await conn.execute(
+                sa.text("""
                         INSERT INTO jobs (
                             job_id, command, start_time, depends_on,
                             max_runtime, max_memory, status,
@@ -68,19 +65,19 @@ class PostgresJobRepository:
                             :created_at, :updated_at
                         )
                         RETURNING """ + _SELECT_COLS),
-                    {
-                        "job_id": str(job.job_id),
-                        "command": job.command,
-                        "start_time": job.start_time,
-                        "depends_on": [str(d) for d in job.depends_on],
-                        "max_runtime": job.max_runtime,
-                        "max_memory": job.max_memory,
-                        "status": job.status.value,
-                        "created_at": job.created_at,
-                        "updated_at": job.updated_at,
-                    },
-                )
-                result = row.fetchone()
+                {
+                    "job_id": str(job.job_id),
+                    "command": job.command,
+                    "start_time": job.start_time,
+                    "depends_on": [str(d) for d in job.depends_on],
+                    "max_runtime": job.max_runtime,
+                    "max_memory": job.max_memory,
+                    "status": job.status.value,
+                    "created_at": job.created_at,
+                    "updated_at": job.updated_at,
+                },
+            )
+            result = row.fetchone()
         assert result is not None
         return _row_to_job(result)
 
@@ -127,9 +124,8 @@ class PostgresJobRepository:
             f"WHERE job_id = :job_id "
             f"AND status NOT IN ({terminal_list})"
         )
-        async with self._engine.connect() as conn:
-            async with conn.begin():
-                result = await conn.execute(query, params)
+        async with self._engine.connect() as conn, conn.begin():
+            result = await conn.execute(query, params)
         return result.rowcount > 0
 
     async def list_by_status(self, status: JobStatus) -> list[Job]:

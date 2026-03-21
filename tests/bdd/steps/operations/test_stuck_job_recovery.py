@@ -13,7 +13,6 @@ from starlette.testclient import TestClient
 
 from tests.bdd.conftest import (
     FakeWorkerHealthClient,
-    TEST_DB_URL,
     db_run,
     get_job_status,
     get_worker_status,

@@ -9,14 +9,12 @@ call_fixture_func mechanism. Use db_run() from conftest for any async DB work.
 
 from __future__ import annotations
 
-import sqlalchemy as sa
 from types import SimpleNamespace
 
+import sqlalchemy as sa
 from pytest_bdd import given, parsers, then
-from starlette.testclient import TestClient
 
-from tests.bdd.conftest import TEST_DB_URL, db_run
-
+from tests.bdd.conftest import db_run
 
 # ── Background steps (used by every feature) ──────────────────────────────
 

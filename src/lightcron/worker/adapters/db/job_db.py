@@ -21,11 +21,10 @@ class AsyncpgJobDB:
 
         Requires pgBouncer pool_mode=session.
         """
-        async with self._engine.connect() as conn:
-            async with conn.begin():
-                # Step 1: find a ready job
-                row = await conn.execute(
-                    sa.text("""
+        async with self._engine.connect() as conn, conn.begin():
+            # Step 1: find a ready job
+            row = await conn.execute(
+                sa.text("""
                         SELECT job_id, command, max_runtime, max_memory
                         FROM jobs
                         WHERE status = 'ready'
@@ -33,14 +32,14 @@ class AsyncpgJobDB:
                         LIMIT 1
                         FOR UPDATE SKIP LOCKED
                     """)
-                )
-                candidate = row.fetchone()
-                if candidate is None:
-                    return None
+            )
+            candidate = row.fetchone()
+            if candidate is None:
+                return None
 
-                # Step 2: atomically claim it
-                result = await conn.execute(
-                    sa.text("""
+            # Step 2: atomically claim it
+            result = await conn.execute(
+                sa.text("""
                         UPDATE jobs
                         SET status = 'assigned',
                             worker_id = :worker_id,
@@ -48,11 +47,11 @@ class AsyncpgJobDB:
                             updated_at = now()
                         WHERE job_id = :job_id AND status = 'ready'
                     """),
-                    {"worker_id": str(worker_id), "job_id": str(candidate.job_id)},
-                )
-                if result.rowcount == 0:
-                    # Another worker won the race
-                    return None
+                {"worker_id": str(worker_id), "job_id": str(candidate.job_id)},
+            )
+            if result.rowcount == 0:
+                # Another worker won the race
+                return None
 
         return JobExecution(
             job_id=candidate.job_id,
@@ -93,9 +92,8 @@ class AsyncpgJobDB:
             f"WHERE job_id = :job_id "
             f"AND status NOT IN {_TERMINAL_STATUSES}"
         )
-        async with self._engine.connect() as conn:
-            async with conn.begin():
-                result = await conn.execute(query, params)
+        async with self._engine.connect() as conn, conn.begin():
+            result = await conn.execute(query, params)
         return result.rowcount > 0
 
     async def check_status(self, job_id: UUID) -> str | None:
