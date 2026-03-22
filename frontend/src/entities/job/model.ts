@@ -15,10 +15,12 @@ export interface Job {
   depends_on: string[];
   max_runtime: number | null;
   max_memory: number | null;
+  env_vars: Record<string, string>;
   status: JobStatus;
   worker_id: string | null;
   exit_code: number | null;
   kill_reason: string | null;
+  peak_memory_mb?: number | null;
   claimed_at: string | null;
   started_at: string | null;
   finished_at: string | null;

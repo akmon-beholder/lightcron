@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import type { JobStatus } from "../../entities/job/model";
 import type { Job } from "../../entities/job/model";
 import { JobStatusBadge } from "../../entities/job/JobStatusBadge";
@@ -52,9 +53,25 @@ export function JobsPanel() {
           </thead>
           <tbody>
             {jobs.map((j: Job) => (
-              <tr key={j.job_id}>
-                <td style={{ ...td, fontFamily: "monospace", fontSize: 12 }}>
-                  {j.job_id.slice(0, 8)}…
+              <tr
+                key={j.job_id}
+                style={{ cursor: "pointer" }}
+                onClick={() => {
+                  // navigation handled by the Link inside the row
+                }}
+              >
+                <td style={{ ...td, fontFamily: "monospace", fontSize: 12, padding: 0 }}>
+                  <Link
+                    to={`/jobs/${j.job_id}`}
+                    style={{
+                      display: "block",
+                      padding: "8px 12px",
+                      color: "#1d4ed8",
+                      textDecoration: "none",
+                    }}
+                  >
+                    {j.job_id.slice(0, 8)}…
+                  </Link>
                 </td>
                 <td style={td}>{truncate(j.command, 80)}</td>
                 <td style={td}>

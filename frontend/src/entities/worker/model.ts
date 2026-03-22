@@ -7,4 +7,5 @@ export interface Worker {
   last_seen: string;
   registered_at: string;
   running_job_count: number;
+  base_url: string | null;
 }

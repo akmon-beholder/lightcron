@@ -1,6 +1,7 @@
 import { createBrowserRouter, RouterProvider, Link, Outlet } from "react-router-dom";
 import { DashboardPage } from "../pages/dashboard";
 import { ScheduleJobPage } from "../pages/schedule-job";
+import { JobDetailPage } from "../pages/job-detail/JobDetailPage";
 
 function NavLayout() {
   return (
@@ -43,6 +44,7 @@ const router = createBrowserRouter([
     children: [
       { path: "/", element: <DashboardPage /> },
       { path: "/jobs/new", element: <ScheduleJobPage /> },
+      { path: "/jobs/:job_id", element: <JobDetailPage /> },
     ],
   },
 ]);

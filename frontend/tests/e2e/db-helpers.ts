@@ -86,3 +86,106 @@ export async function insertJob(opts: {
     return res.rows[0].job_id as string;
   });
 }
+
+/**
+ * Extended insertJob that supports v2 fields: env_vars, peak_memory_mb,
+ * kill_reason, and explicit started_at / finished_at timestamps.
+ */
+export async function insertJobV2(opts: {
+  command?: string;
+  status: string;
+  workerId?: string | null;
+  startTimeOffsetSeconds?: number;
+  startedAtOffsetSeconds?: number | null;
+  finishedAtOffsetSeconds?: number | null;
+  peakMemoryMb?: number | null;
+  killReason?: string | null;
+  envVars?: Record<string, string>;
+}): Promise<string> {
+  const {
+    command = "echo e2e-test",
+    status,
+    workerId = null,
+    startTimeOffsetSeconds = -10,
+    startedAtOffsetSeconds = null,
+    finishedAtOffsetSeconds = null,
+    peakMemoryMb = null,
+    killReason = null,
+    envVars = {},
+  } = opts;
+
+  // Compute started_at offset
+  const computedStartedAt =
+    startedAtOffsetSeconds !== null
+      ? startedAtOffsetSeconds
+      : ["running", "completed", "failed", "lost", "cancelled"].includes(status)
+      ? -5
+      : null;
+
+  // Compute finished_at offset
+  const computedFinishedAt =
+    finishedAtOffsetSeconds !== null
+      ? finishedAtOffsetSeconds
+      : ["completed", "failed"].includes(status)
+      ? 0
+      : null;
+
+  return withClient(async (client) => {
+    const res = await client.query(
+      `INSERT INTO jobs (
+         command, start_time, status, worker_id,
+         started_at, finished_at,
+         peak_memory_mb, kill_reason, env_vars
+       ) VALUES (
+         $1,
+         now() + $2 * interval '1 second',
+         CAST($3 AS job_status),
+         $4,
+         CASE WHEN $5::float IS NOT NULL
+              THEN now() + $5::float * interval '1 second' ELSE NULL END,
+         CASE WHEN $6::float IS NOT NULL
+              THEN now() + $6::float * interval '1 second' ELSE NULL END,
+         $7,
+         $8,
+         $9::jsonb
+       )
+       RETURNING job_id`,
+      [
+        command,
+        startTimeOffsetSeconds,
+        status,
+        workerId,
+        computedStartedAt,
+        computedFinishedAt,
+        peakMemoryMb,
+        killReason,
+        JSON.stringify(envVars),
+      ]
+    );
+    return res.rows[0].job_id as string;
+  });
+}
+
+/**
+ * Extended insertWorker that supports v2 fields: base_url.
+ */
+export async function insertWorkerV2(opts: {
+  hostname: string;
+  status?: "online" | "offline";
+  lastSeenOffsetSeconds?: number;
+  baseUrl?: string | null;
+}): Promise<string> {
+  const { hostname, status = "online", lastSeenOffsetSeconds = 0, baseUrl = null } = opts;
+  return withClient(async (client) => {
+    const res = await client.query(
+      `INSERT INTO worker_status (hostname, status, last_seen, registered_at, base_url)
+       VALUES ($1, CAST($2 AS worker_status_enum),
+               now() - $3 * interval '1 second',
+               now() - $3 * interval '1 second',
+               $4)
+       RETURNING worker_id`,
+      [hostname, status, lastSeenOffsetSeconds, baseUrl]
+    );
+    return res.rows[0].worker_id as string;
+  });
+}

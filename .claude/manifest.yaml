@@ -4,7 +4,7 @@ project_name: "Lightcron"
 created: "2026-03-20T00:00:00Z"
 last_updated: "2026-03-21T00:00:00Z"
 lifecycle_mode: "lean"
-phase: "design"
+phase: "verify"
 enforcement_log: ".claude/evolution/enforcement.log"
 
 artifact_versions:
@@ -24,7 +24,51 @@ exclusive_permissions:
   define_user_journeys: design
 
 outstanding:
-  tasks: []
+  tasks:
+    - id: T2-001
+      title: "DB migration: env_vars, peak_memory_mb, base_url"
+      owner: back
+      status: completed
+    - id: T2-002
+      title: "Constants: WORKER_DEFAULT_JOBS_DIR"
+      owner: back
+      status: completed
+    - id: T2-003
+      title: "Backend: Job + Worker entity + response schemas"
+      owner: back
+      status: completed
+    - id: T2-004
+      title: "Backend: POST /jobs env_vars validation"
+      owner: back
+      status: completed
+    - id: T2-005
+      title: "Backend: GET /jobs/{job_id} + GET /jobs + GET /workers responses"
+      owner: back
+      status: completed
+    - id: T2-006
+      title: "Worker agent: jobs dir, file output, env_vars, peak_memory_mb, base_url"
+      owner: back
+      status: completed
+    - id: T2-007
+      title: "Worker REST API: stdout/stderr endpoints + CORS"
+      owner: back
+      status: completed
+    - id: T2-008
+      title: "BDD tests for all new backend behaviour"
+      owner: back
+      status: completed
+    - id: T2-009
+      title: "Frontend: Job/Worker types + useJob + useJobOutput hooks"
+      owner: front
+      status: completed
+    - id: T2-010
+      title: "Frontend: job detail page + clickable dashboard rows"
+      owner: front
+      status: completed
+    - id: T2-011
+      title: "Frontend: Playwright e2e tests for job-detail.feature"
+      owner: front
+      status: completed
   remediation: []
 
 reviews: {}
