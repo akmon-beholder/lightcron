@@ -131,6 +131,25 @@ class AsyncpgJobDB:
             result = row.fetchone()
         return result.status if result else None
 
+    async def update_peak_memory(self, job_id: UUID, peak_memory_mb: float) -> bool:
+        """Write peak_memory_mb on a cancelled or lost job row (no status change).
+
+        The WHERE clause restricts to status IN ('cancelled', 'lost') so this is
+        safe against races: it silently no-ops if the row has moved to a different
+        state.
+        """
+        query = sa.text(
+            "UPDATE jobs SET peak_memory_mb = :peak_memory_mb, updated_at = now() "
+            "WHERE job_id = :job_id "
+            "AND status IN ('cancelled', 'lost')"
+        )
+        async with self._engine.connect() as conn, conn.begin():
+            result = await conn.execute(
+                query,
+                {"peak_memory_mb": peak_memory_mb, "job_id": str(job_id)},
+            )
+        return result.rowcount > 0
+
     async def count_active_jobs(self, worker_id: UUID) -> int:
         async with self._engine.connect() as conn:
             row = await conn.execute(

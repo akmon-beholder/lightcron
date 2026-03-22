@@ -41,6 +41,15 @@ class JobDB(Protocol):
         """Return the current status string of the job, or None if not found."""
         ...
 
+    async def update_peak_memory(self, job_id: UUID, peak_memory_mb: float) -> bool:
+        """Write peak_memory_mb for a job that is already in a terminal state.
+
+        Only updates rows whose status is 'cancelled' or 'lost' (the two states
+        where the scheduler, not the worker, owns the status field).  Returns True
+        if the row was updated, False if it was not found or the guard blocked it.
+        """
+        ...
+
     async def count_active_jobs(self, worker_id: UUID) -> int:
         """Return the count of assigned+running jobs for this worker."""
         ...

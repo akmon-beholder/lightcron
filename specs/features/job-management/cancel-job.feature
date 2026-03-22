@@ -62,3 +62,11 @@ Feature: Cancel a Job
     When POST /jobs/j-006/cancel is called
     Then the response status is 200
     And job "j-006" status is "cancelled" in the jobs table
+
+  @peak-memory
+  Scenario: Worker writes peak_memory_mb when it detects a cancelled job and stops the process
+    Given a worker "w-003" is registered in worker_status with status "online"
+    And a job "j-007" has status "cancelled" with worker_id "w-003"
+    When the worker_agent processes the cancellation of "j-007" with peak_memory_mb 42.5
+    Then job "j-007" peak_memory_mb in the jobs table is 42.5
+    And job "j-007" status is "cancelled" in the jobs table

@@ -88,10 +88,12 @@ class ExecutionService:
             if status == "cancelled":
                 logger.info("Job %s cancelled — stopping process", job.job_id)
                 await self._stop_process(pid)
+                await self._db.update_peak_memory(job.job_id, peak_memory_mb)
                 return
             if status == "lost":
                 logger.info("Job %s marked lost by scheduler — killing process immediately", job.job_id)
                 self._pm.kill_group(pid, signal.SIGKILL)
+                await self._db.update_peak_memory(job.job_id, peak_memory_mb)
                 return
 
             # Enforce max_runtime
