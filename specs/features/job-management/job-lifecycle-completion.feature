@@ -58,3 +58,51 @@ Feature: Job Runs to Completion
     Then the response status is 200
     And the response contains status "failed"
     And the response contains exit_code 2
+
+  # ── Output file storage ───────────────────────────────────────────────────────
+
+  @smoke
+  Scenario: Worker writes stdout and stderr to files in the jobs directory
+    Given the worker is configured with LIGHTCRON_JOBS_DIR "/tmp/lightcron-test-jobs"
+    And a job "j-002" is running with worker_id "w-001"
+    When the job process for "j-002" writes "hello stdout" to stdout
+    And the job process for "j-002" writes "hello stderr" to stderr
+    And the job process for "j-002" exits with code 0
+    Then the file "/tmp/lightcron-test-jobs/j-002.stdout" contains "hello stdout"
+    And the file "/tmp/lightcron-test-jobs/j-002.stderr" contains "hello stderr"
+    And job "j-002" status in the jobs table is "completed"
+
+  Scenario: Worker defaults to /var/logs/lightcron/jobs when LIGHTCRON_JOBS_DIR is not set
+    Given the worker is started without LIGHTCRON_JOBS_DIR configured
+    Then the worker uses "/var/logs/lightcron/jobs" as the jobs output directory
+
+  Scenario: Output files contain partial content when a job is killed
+    Given the worker is configured with LIGHTCRON_JOBS_DIR "/tmp/lightcron-test-jobs"
+    And a job "j-003" has max_runtime set to 1 second
+    And the job process for "j-003" writes "partial output" to stdout before being killed
+    When the worker_agent detects max_runtime is exceeded and kills the process
+    Then the file "/tmp/lightcron-test-jobs/j-003.stdout" contains "partial output"
+    And job "j-003" kill_reason is "max_runtime_exceeded"
+
+  @smoke
+  Scenario: Worker REST API serves stdout file content
+    Given the worker is configured with LIGHTCRON_JOBS_DIR "/tmp/lightcron-test-jobs"
+    And the file "/tmp/lightcron-test-jobs/j-004.stdout" contains "output line 1"
+    When GET /jobs/j-004/stdout is called on the worker REST API
+    Then the response status is 200
+    And the response content-type is "text/plain"
+    And the response body is "output line 1"
+
+  @smoke
+  Scenario: Worker REST API serves stderr file content
+    Given the worker is configured with LIGHTCRON_JOBS_DIR "/tmp/lightcron-test-jobs"
+    And the file "/tmp/lightcron-test-jobs/j-004.stderr" contains "error line 1"
+    When GET /jobs/j-004/stderr is called on the worker REST API
+    Then the response status is 200
+    And the response body is "error line 1"
+
+  @error-handling
+  Scenario: Worker REST API returns 404 when output file does not exist
+    Given no output file exists for job "j-005"
+    When GET /jobs/j-005/stdout is called on the worker REST API
+    Then the response status is 404

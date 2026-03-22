@@ -1,8 +1,8 @@
 # User Journeys — Lightcron
 
-**Version**: 1.2
+**Version**: 1.3
 **Created**: 2026-03-21
-**Updated**: 2026-03-21 — v1.2: added J011 (Inspect Job Detail via Web UI); updated J001 with env_vars AC; updated dependency map and test coverage matrix
+**Updated**: 2026-03-21 — v1.3: stdout/stderr stored as files on the worker node (not in DB); worker exposes new REST endpoints for log retrieval; UI fetches logs directly from worker REST API; GET /workers extended with base_url; R12 amended; J004 and J011 updated accordingly
 **Agent**: design (Phase A)
 
 ---
@@ -172,9 +172,9 @@ As the worker_agent, I want to let a job process run until it exits naturally an
 
 | Step | User Action                                      | System Response                                  | Success Criteria                         |
 |------|--------------------------------------------------|--------------------------------------------------|------------------------------------------|
-| 1    | (worker_agent has started job process)           | Process runs; worker_agent monitors it           | Job status is `running`                  |
-| 2    | Job process exits                                | worker_agent records exit_code; writes `completed` (exit 0) or `failed` (exit != 0) to jobs table | Job status is terminal |
-| 3    | job_submitter calls GET /jobs/{job_id}           | Returns status, exit_code, started_at, finished_at, worker_id | Submitter can confirm outcome    |
+| 1    | (worker_agent has started job process)           | Process runs; worker_agent monitors it; stdout and stderr are streamed to files on the worker node | Job status is `running`; output files exist at `{LIGHTCRON_JOBS_DIR}/{job_id}.stdout` and `{LIGHTCRON_JOBS_DIR}/{job_id}.stderr` |
+| 2    | Job process exits                                | worker_agent records exit_code and peak_memory_mb; writes `completed` (exit 0) or `failed` (exit != 0) to jobs table; output files remain on disk | Job status is terminal; output files readable via worker REST API |
+| 3    | job_submitter calls GET /jobs/{job_id}           | Returns status, exit_code, started_at, finished_at, worker_id, peak_memory_mb | Submitter can confirm outcome    |
 
 ### Acceptance Criteria
 
@@ -186,7 +186,10 @@ As the worker_agent, I want to let a job process run until it exits naturally an
 - **AC-J004-07**: Given a job with max_memory set and the process exceeds that limit, Then the worker_agent sends SIGTERM to the process
 - **AC-J004-08**: Given a SIGTERM was sent for a memory violation and the process does not exit within the grace period, Then the worker_agent sends SIGKILL; the job is marked `failed` with a kill_reason of `max_memory_exceeded`
 - **AC-J004-09**: Given a job with no max_memory set, Then the worker_agent places no memory limit on the process
-- **AC-J004-06**: Given a completed or failed job, When GET /jobs/{job_id} is called, Then the response includes exit_code, started_at, finished_at, and worker_id
+- **AC-J004-06**: Given a completed or failed job, When GET /jobs/{job_id} is called, Then the response includes exit_code, started_at, finished_at, worker_id, and peak_memory_mb
+- **AC-J004-10**: Given a job process is running, Then the worker_agent streams its stdout to `{LIGHTCRON_JOBS_DIR}/{job_id}.stdout` and its stderr to `{LIGHTCRON_JOBS_DIR}/{job_id}.stderr`; the files are created at process start and remain on disk after the process exits
+- **AC-J004-11**: Given `LIGHTCRON_JOBS_DIR` is not set, Then the worker_agent defaults to `/var/logs/lightcron/jobs` as the output directory
+- **AC-J004-12**: Given a job that is killed (max_runtime or max_memory exceeded), Then the output files contain whatever was written up to the point of termination; the files are not deleted or truncated by the kill sequence
 
 ### BDD Feature File
 
@@ -197,9 +200,10 @@ As the worker_agent, I want to let a job process run until it exits naturally an
 | Scenario                   | Trigger                              | Expected Behaviour                              |
 |----------------------------|--------------------------------------|-------------------------------------------------|
 | Non-zero exit code         | Process exits with code != 0         | Status → `failed`, exit_code recorded           |
-| max_runtime exceeded       | Process runs longer than max_runtime | SIGTERM → grace → SIGKILL; status → `failed`, kill_reason `max_runtime_exceeded` |
-| max_memory exceeded        | Process exceeds max_memory           | SIGTERM → grace → SIGKILL; status → `failed`, kill_reason `max_memory_exceeded`  |
-| Worker agent crashes mid-job | Heartbeat expires while `running`  | Scheduler marks job `lost`                 |
+| max_runtime exceeded       | Process runs longer than max_runtime | SIGTERM → grace → SIGKILL; status → `failed`, kill_reason `max_runtime_exceeded`; partial output files retained |
+| max_memory exceeded        | Process exceeds max_memory           | SIGTERM → grace → SIGKILL; status → `failed`, kill_reason `max_memory_exceeded`; partial output files retained  |
+| Worker agent crashes mid-job | Heartbeat expires while `running`  | Scheduler marks job `lost`; output files remain on disk at whatever state they were |
+| Output directory missing   | LIGHTCRON_JOBS_DIR path does not exist | worker_agent creates the directory on startup  |
 
 ---
 
@@ -443,25 +447,37 @@ As a platform_operator or sre_operator, I want to click on a job in the dashboar
 
 ### Background
 
-This journey introduces four new data fields that must be stored in the `jobs` table and exposed on `GET /jobs/{job_id}`:
+This journey introduces new data accessible from the job detail page. Some fields are stored in the `jobs` table; stdout and stderr are stored as files on the worker node and retrieved via the worker's REST API.
 
+**Fields stored in the `jobs` table** (returned by `GET /jobs/{job_id}`):
 - **`env_vars`**: a flat key-value map of strings submitted at schedule time (POST /jobs) and passed by the worker to the subprocess environment at execution time. Stored at creation; not mutated after submission.
-- **`stdout_output`**: the full captured stdout of the subprocess. Written by the worker_agent to the DB on job completion or termination (not streamed). NULL while the job is running or if the job produced no stdout.
-- **`stderr_output`**: the full captured stderr of the subprocess. Same capture and storage semantics as stdout_output.
 - **`peak_memory_mb`**: the highest RSS memory reading (in MB) observed by psutil during execution. Written by the worker_agent to the DB on job completion or termination. NULL before the job has started.
 
-Actual runtime is derived by the UI from `started_at` and `finished_at` and is not a separately stored field (unless the BA decides otherwise). If `finished_at` is NULL (job still running), the UI should display a live elapsed time derived from `started_at` and the current clock.
+**Fields stored as files on the worker node**:
+- **stdout**: written to `{LIGHTCRON_JOBS_DIR}/{job_id}.stdout` during job execution.
+- **stderr**: written to `{LIGHTCRON_JOBS_DIR}/{job_id}.stderr` during job execution.
+- Retrieved via new worker REST API endpoints (see below). The web UI calls the worker REST API directly for log retrieval — this is an explicit exception to the general rule that the UI communicates only with the scheduler.
+
+**New worker REST API endpoints** (added in this journey):
+- `GET /jobs/{job_id}/stdout` → `200 text/plain` (file content) | `404` if file not found
+- `GET /jobs/{job_id}/stderr` → `200 text/plain` (file content) | `404` if file not found
+- Worker CORS must be configured to allow the UI origin (same mechanism as the scheduler's `LIGHTCRON_UI_ORIGIN`).
+
+**Worker URL discovery**: `GET /workers` (scheduler) is extended with a `base_url` field (e.g. `http://worker-hostname:8001`) so the UI can construct worker endpoint URLs without hardcoding. The worker registers its base URL with the scheduler at startup.
+
+Actual runtime is derived by the UI from `started_at` and `finished_at` — not stored separately.
 
 ### Flow Steps
 
 | Step | User Action                                           | System Response                                                                    | Success Criteria                                     |
 |------|-------------------------------------------------------|------------------------------------------------------------------------------------|------------------------------------------------------|
 | 1    | User is on the dashboard jobs panel; clicks on a job row | UI navigates to the job detail page at `/jobs/{job_id}` | Job detail page loads for that job_id              |
-| 2    | UI fetches GET /jobs/{job_id}                         | Scheduler returns the full job object, now including env_vars, stdout_output, stderr_output, peak_memory_mb | HTTP 200 with complete job record |
-| 3    | Detail page renders all job fields                    | UI displays: job_id, command, status (badge), start_time, started_at, finished_at, actual runtime, worker_id, exit_code, kill_reason (if set), depends_on list, max_runtime, max_memory, peak_memory_mb, env_vars table, stdout block, stderr block | All fields visible |
-| 4    | User inspects stdout/stderr output                    | UI renders stdout_output and stderr_output in separate read-only pre/code blocks with a scroll area | Output is readable; long output does not overflow the layout |
-| 5    | User inspects env_vars                                | UI renders env_vars as a two-column table (key / value); empty state shown if no env_vars were set | Env vars are easy to scan |
-| 6    | User navigates back to dashboard                      | Browser back button or a "Back to dashboard" link returns to `/`                  | Navigation works as expected                         |
+| 2    | UI fetches `GET /jobs/{job_id}` from scheduler        | Scheduler returns the job object including env_vars and peak_memory_mb (no output content) | HTTP 200; core fields rendered; worker_id known |
+| 3    | UI fetches `GET /workers` (or uses cached data) to resolve the worker's base_url | Scheduler returns worker list including base_url for each worker | UI has the target worker's API URL |
+| 4    | UI fetches `GET /jobs/{job_id}/stdout` and `GET /jobs/{job_id}/stderr` from the worker's REST API | Worker returns file content as text/plain | stdout and stderr blocks populated |
+| 5    | User inspects stdout/stderr output                    | UI renders each stream in a separate read-only scrollable code block; stderr visually distinguished from stdout | Output is readable; long output does not overflow the layout |
+| 6    | User inspects env_vars                                | UI renders env_vars as a two-column table (key / value); empty state shown if no env_vars were set | Env vars are easy to scan |
+| 7    | User navigates back to dashboard                      | Browser back button or a "Back to dashboard" link returns to `/`                  | Navigation works as expected                         |
 
 ### Acceptance Criteria
 
@@ -470,17 +486,19 @@ Actual runtime is derived by the UI from `started_at` and `finished_at` and is n
 - **AC-J011-03**: Given a running job with started_at set and finished_at NULL, When the detail page is loaded, Then the UI displays a live elapsed time counting up from started_at using the current local clock
 - **AC-J011-04**: Given a completed or failed job with peak_memory_mb set, When the detail page is loaded, Then the UI displays peak_memory_mb in megabytes (e.g. "128 MB")
 - **AC-J011-05**: Given a pending or assigned job (not yet started) where peak_memory_mb is NULL, When the detail page is loaded, Then the peak memory field shows a "not yet available" placeholder rather than a blank or error
-- **AC-J011-06**: Given a completed job with non-empty stdout_output, When the detail page is loaded, Then the stdout block renders the captured text in a read-only scrollable code block
-- **AC-J011-07**: Given a completed job with empty or NULL stdout_output, When the detail page is loaded, Then the stdout block shows a "No output" empty state message rather than a blank space
-- **AC-J011-08**: Given a completed job with non-empty stderr_output, When the detail page is loaded, Then the stderr block renders the captured text in a read-only scrollable code block, visually distinguished from stdout (e.g. different label or border colour)
-- **AC-J011-09**: Given a completed job with empty or NULL stderr_output, When the detail page is loaded, Then the stderr block shows a "No output" empty state message
-- **AC-J011-10**: Given a failed job with kill_reason set (e.g. `max_runtime_exceeded` or `max_memory_exceeded`), When the detail page is loaded, Then kill_reason is displayed prominently (e.g. as a warning banner above the output sections), and stderr_output is shown even if partial
+- **AC-J011-06**: Given a completed job, When the detail page loads, Then the UI fetches `GET /jobs/{job_id}/stdout` from the worker's REST API and renders the response in a read-only scrollable code block
+- **AC-J011-07**: Given the worker returns a 404 for `GET /jobs/{job_id}/stdout` (file not found or job produced no stdout), When the detail page loads, Then the stdout block shows a "No output" empty state message
+- **AC-J011-08**: Given a completed job, When the detail page loads, Then the UI fetches `GET /jobs/{job_id}/stderr` from the worker's REST API and renders the response in a read-only scrollable code block, visually distinguished from stdout
+- **AC-J011-09**: Given the worker returns a 404 for `GET /jobs/{job_id}/stderr`, When the detail page loads, Then the stderr block shows a "No output" empty state message
+- **AC-J011-10**: Given a failed job with kill_reason set (e.g. `max_runtime_exceeded` or `max_memory_exceeded`), When the detail page is loaded, Then kill_reason is displayed prominently (e.g. as a warning banner above the output sections), and stderr is shown even if partial
 - **AC-J011-11**: Given a job whose env_vars map is non-empty, When the detail page is loaded, Then the UI renders the env_vars as a two-column key/value table
 - **AC-J011-12**: Given a job whose env_vars map is empty (no env_vars were submitted), When the detail page is loaded, Then the env_vars section shows a "No environment variables" empty state rather than a blank table
 - **AC-J011-13**: Given a job_id that does not exist in the scheduler, When the UI fetches GET /jobs/{job_id}, Then the detail page renders a clear "Job not found" error state with a link back to the dashboard
-- **AC-J011-14**: Given a running job, When the detail page is displayed, Then stdout_output, stderr_output, and peak_memory_mb all show a "job in progress" or "not yet available" placeholder (output is not streamed; it is only available after the job finishes)
-- **AC-J011-15**: Given the detail page is open and the auto-refresh interval elapses, Then the UI re-fetches GET /jobs/{job_id} and updates all displayed fields, so that a running job's status and live elapsed time stay current without a page reload
+- **AC-J011-14**: Given a running job, When the detail page is displayed, Then the output sections show a "job in progress" placeholder; the UI does not attempt to fetch output from the worker until the job is in a terminal state
+- **AC-J011-15**: Given the detail page is open and the auto-refresh interval elapses, Then the UI re-fetches `GET /jobs/{job_id}` from the scheduler and updates all displayed fields; once the job reaches a terminal state the UI also fetches the output files from the worker
 - **AC-J011-16**: Given a job with env_vars submitted at schedule time, When the worker_agent claims and starts the job, Then the subprocess is launched with the env_vars merged into the worker's environment (worker base env vars plus the job's env_vars; job env_vars take precedence on key collision)
+- **AC-J011-17**: Given the worker node is offline or unreachable, When the UI attempts to fetch output files, Then the output sections display a "Worker offline — logs unavailable" message rather than an error
+- **AC-J011-18**: Given the `GET /workers` response includes a `base_url` for each worker, When the UI needs to fetch output for a job, Then it uses the `base_url` of the job's assigned worker to construct the log endpoint URL
 
 ### BDD Feature File
 
@@ -491,11 +509,12 @@ Actual runtime is derived by the UI from `started_at` and `finished_at` and is n
 | Scenario                         | Trigger                                         | Expected Behaviour                                                               |
 |----------------------------------|-------------------------------------------------|----------------------------------------------------------------------------------|
 | Job not found                    | job_id in URL does not exist in DB              | Detail page shows "Job not found" error state with link back to dashboard        |
-| Job still running — no output    | stdout_output and stderr_output are NULL        | Output sections show "job in progress" placeholder; no error                    |
-| Job killed — partial stderr      | kill_reason set; stderr_output may be partial   | kill_reason shown as warning banner; stderr block shows partial content          |
+| Job still running — no output    | Job status is not terminal                      | Output sections show "job in progress" placeholder; no fetch to worker API       |
+| Job killed — partial stderr      | kill_reason set; stderr file may be partial     | kill_reason shown as warning banner; stderr block shows partial content from worker API |
 | No env_vars                      | env_vars is empty map                           | Env vars section shows "No environment variables" empty state                   |
 | Scheduler API unreachable        | GET /jobs/{job_id} returns network error        | Detail page shows generic "Could not load job" error with retry option           |
-| Output truncated at storage limit | stdout_output or stderr_output very large       | BA to decide on max storage size and truncation strategy; UI should indicate if truncation occurred |
+| Worker offline                   | Worker REST API unreachable                     | Output sections show "Worker offline — logs unavailable"                         |
+| Output file not found on worker  | Worker returns 404 for stdout or stderr         | Relevant block shows "No output" empty state                                     |
 
 ---
 
@@ -559,11 +578,12 @@ J001 (Schedule Job with env_vars) — env_vars stored at creation
   - Accepted trade-off: pull-based adds latency (poll interval) vs. push-based; acceptable for v1
   - Job process lifecycle (SIGTERM → grace → SIGKILL) owned by the worker_agent
   - All state lives in the database — ACID guarantees are critical for status transitions
-  - Web UI (J009, J010, J011) is a React/TypeScript SPA; communicates with the scheduler REST API only; tested with Playwright
-  - **New (v1.2)**: `env_vars` is a flat key-value string map stored on the job at creation and passed by the worker_agent to the subprocess environment at execution time; displayed on the job detail page
-  - **New (v1.2)**: `stdout_output` and `stderr_output` are captured by the worker_agent at completion (not streamed) and stored in the DB; displayed on the job detail page in read-only scrollable blocks
-  - **New (v1.2)**: `peak_memory_mb` is the highest RSS reading observed during execution, written to the DB on job completion or termination by the worker_agent; displayed on the job detail page
-  - **New (v1.2)**: Actual runtime is derived in the UI from `started_at` / `finished_at`; no separate stored column unless BA decides otherwise
-  - **New (v1.2)**: The `jobs` table requires four new columns: `env_vars` (JSONB or HSTORE), `stdout_output` (TEXT NULL), `stderr_output` (TEXT NULL), `peak_memory_mb` (NUMERIC NULL); BA to decide column types and storage limits
-  - **New (v1.2)**: Output capture size limits and truncation strategy are an open question for BA — very large outputs could inflate DB row sizes; BA should define a max capture size and whether the UI should indicate truncation
+  - Web UI (J009, J010, J011) is a React/TypeScript SPA; communicates with the scheduler REST API for all data except job output logs; tested with Playwright
+  - **New (v1.3)**: `env_vars` is a flat key-value string map stored on the job at creation and passed by the worker_agent to the subprocess environment at execution time; displayed on the job detail page
+  - **New (v1.3)**: stdout and stderr are written as files on the worker node during job execution (`{LIGHTCRON_JOBS_DIR}/{job_id}.stdout` / `.stderr`); `LIGHTCRON_JOBS_DIR` defaults to `/var/logs/lightcron/jobs`; worker creates the directory on startup if absent
+  - **New (v1.3)**: Worker exposes two new REST endpoints: `GET /jobs/{job_id}/stdout` and `GET /jobs/{job_id}/stderr` returning `text/plain`; the Web UI calls these directly (explicit exception to the general scheduler-only rule)
+  - **New (v1.3)**: Worker CORS must allow the UI origin; `GET /workers` response extended with `base_url` field so the UI can discover worker endpoints at runtime
+  - **New (v1.3)**: `peak_memory_mb` is the highest RSS reading observed during execution, written to the DB on job completion or termination; displayed on the job detail page
+  - **New (v1.3)**: Actual runtime is derived in the UI from `started_at` / `finished_at`; not stored separately
+  - **New (v1.3)**: `jobs` table requires two new columns: `env_vars` (JSONB NOT NULL DEFAULT '{}') and `peak_memory_mb` (DOUBLE PRECISION NULL); no stdout/stderr columns in DB
 - Suggested Implementation Order: J002 → J001 → J003 → J004 → J008 → J005 → J006 → J007 → J009 → J010 → J011

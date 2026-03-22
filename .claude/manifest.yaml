@@ -13,6 +13,8 @@ artifact_versions:
   solution_envelope: "001_solution_envelope_v2.md"
   spec: "002_spec_v1.md"
   tasklist: "003_tasklist_v1.md"
+  spec_v2: "004_spec_v2.md"
+  tasklist_v2: "005_tasklist_v2.md"
 
 
 exclusive_permissions:
