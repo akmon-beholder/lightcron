@@ -38,6 +38,8 @@ class Job:
     depends_on: list[UUID] = field(default_factory=list)
     max_runtime: int | None = None   # seconds
     max_memory: int | None = None    # MB
+    env_vars: dict[str, str] = field(default_factory=dict)
+    peak_memory_mb: float | None = None
     worker_id: UUID | None = None
     exit_code: int | None = None
     kill_reason: str | None = None

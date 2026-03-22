@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -11,14 +12,36 @@ from lightcron.scheduler.domain.jobs.entities import Job, JobStatus
 
 _TERMINAL_STATUSES = ("completed", "failed", "cancelled", "lost")
 
-_SELECT_COLS = """
+# Columns for detail (single-job) queries — includes peak_memory_mb
+_SELECT_DETAIL_COLS = """
     job_id, command, start_time, depends_on, max_runtime, max_memory,
+    env_vars, peak_memory_mb,
+    status, worker_id, exit_code, kill_reason,
+    claimed_at, started_at, finished_at, created_at, updated_at
+"""
+
+# Columns for list queries — excludes peak_memory_mb for efficiency
+_SELECT_LIST_COLS = """
+    job_id, command, start_time, depends_on, max_runtime, max_memory,
+    env_vars,
     status, worker_id, exit_code, kill_reason,
     claimed_at, started_at, finished_at, created_at, updated_at
 """
 
 
-def _row_to_job(row: sa.engine.Row) -> Job:  # type: ignore[type-arg]
+def _row_to_job(row: sa.engine.Row, include_peak: bool = False) -> Job:  # type: ignore[type-arg]
+    env_vars: dict[str, str] = {}
+    raw_env = row.env_vars
+    if raw_env:
+        if isinstance(raw_env, str):
+            env_vars = json.loads(raw_env)
+        else:
+            env_vars = dict(raw_env)
+
+    peak_memory_mb: float | None = None
+    if include_peak:
+        peak_memory_mb = row.peak_memory_mb
+
     return Job(
         job_id=row.job_id,
         command=row.command,
@@ -26,6 +49,8 @@ def _row_to_job(row: sa.engine.Row) -> Job:  # type: ignore[type-arg]
         depends_on=list(row.depends_on) if row.depends_on else [],
         max_runtime=row.max_runtime,
         max_memory=row.max_memory,
+        env_vars=env_vars,
+        peak_memory_mb=peak_memory_mb,
         status=JobStatus(row.status),
         worker_id=row.worker_id,
         exit_code=row.exit_code,
@@ -45,11 +70,11 @@ class PostgresJobRepository:
     async def get(self, job_id: UUID) -> Job | None:
         async with self._engine.connect() as conn:
             row = await conn.execute(
-                sa.text(f"SELECT {_SELECT_COLS} FROM jobs WHERE job_id = :id"),
+                sa.text(f"SELECT {_SELECT_DETAIL_COLS} FROM jobs WHERE job_id = :id"),
                 {"id": str(job_id)},
             )
             result = row.fetchone()
-        return _row_to_job(result) if result else None
+        return _row_to_job(result, include_peak=True) if result else None
 
     async def save(self, job: Job) -> Job:
         async with self._engine.connect() as conn, conn.begin():
@@ -57,14 +82,14 @@ class PostgresJobRepository:
                 sa.text("""
                         INSERT INTO jobs (
                             job_id, command, start_time, depends_on,
-                            max_runtime, max_memory, status,
+                            max_runtime, max_memory, env_vars, status,
                             created_at, updated_at
                         ) VALUES (
                             :job_id, :command, :start_time, :depends_on,
-                            :max_runtime, :max_memory, :status,
+                            :max_runtime, :max_memory, cast(:env_vars as jsonb), :status,
                             :created_at, :updated_at
                         )
-                        RETURNING """ + _SELECT_COLS),
+                        RETURNING """ + _SELECT_DETAIL_COLS),
                 {
                     "job_id": str(job.job_id),
                     "command": job.command,
@@ -72,6 +97,7 @@ class PostgresJobRepository:
                     "depends_on": [str(d) for d in job.depends_on],
                     "max_runtime": job.max_runtime,
                     "max_memory": job.max_memory,
+                    "env_vars": json.dumps(job.env_vars),
                     "status": job.status.value,
                     "created_at": job.created_at,
                     "updated_at": job.updated_at,
@@ -79,7 +105,7 @@ class PostgresJobRepository:
             )
             result = row.fetchone()
         assert result is not None
-        return _row_to_job(result)
+        return _row_to_job(result, include_peak=True)
 
     async def update_status(
         self,
@@ -131,20 +157,20 @@ class PostgresJobRepository:
     async def list_by_status(self, status: JobStatus) -> list[Job]:
         async with self._engine.connect() as conn:
             rows = await conn.execute(
-                sa.text(f"SELECT {_SELECT_COLS} FROM jobs WHERE status = :status"),
+                sa.text(f"SELECT {_SELECT_LIST_COLS} FROM jobs WHERE status = :status"),
                 {"status": status.value},
             )
-        return [_row_to_job(r) for r in rows.fetchall()]
+        return [_row_to_job(r, include_peak=False) for r in rows.fetchall()]
 
     async def list_by_worker(self, worker_id: UUID) -> list[Job]:
         async with self._engine.connect() as conn:
             rows = await conn.execute(
                 sa.text(
-                    f"SELECT {_SELECT_COLS} FROM jobs WHERE worker_id = :worker_id"
+                    f"SELECT {_SELECT_LIST_COLS} FROM jobs WHERE worker_id = :worker_id"
                 ),
                 {"worker_id": str(worker_id)},
             )
-        return [_row_to_job(r) for r in rows.fetchall()]
+        return [_row_to_job(r, include_peak=False) for r in rows.fetchall()]
 
     async def exists_all(self, job_ids: list[UUID]) -> bool:
         if not job_ids:

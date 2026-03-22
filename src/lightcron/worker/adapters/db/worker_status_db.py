@@ -12,18 +12,18 @@ class AsyncpgWorkerStatusDB:
     def __init__(self, engine: AsyncEngine) -> None:
         self._engine = engine
 
-    async def upsert_worker(self, hostname: str) -> UUID:
+    async def upsert_worker(self, hostname: str, base_url: str | None = None) -> UUID:
         """Upsert by hostname; preserve existing worker_id on conflict."""
         async with self._engine.connect() as conn, conn.begin():
             row = await conn.execute(
                 sa.text("""
-                        INSERT INTO worker_status (hostname, status, last_seen, registered_at)
-                        VALUES (:hostname, 'online', now(), now())
+                        INSERT INTO worker_status (hostname, status, last_seen, registered_at, base_url)
+                        VALUES (:hostname, 'online', now(), now(), :base_url)
                         ON CONFLICT (hostname) DO UPDATE
-                            SET status = 'online', last_seen = now()
+                            SET status = 'online', last_seen = now(), base_url = :base_url
                         RETURNING worker_id
                     """),
-                {"hostname": hostname},
+                {"hostname": hostname, "base_url": base_url},
             )
             return UUID(str(row.scalar_one()))
 

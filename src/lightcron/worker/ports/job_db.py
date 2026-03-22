@@ -27,6 +27,7 @@ class JobDB(Protocol):
         *,
         exit_code: int | None = None,
         kill_reason: str | None = None,
+        peak_memory_mb: float | None = None,
         started_at: object = None,
         finished_at: object = None,
     ) -> bool:

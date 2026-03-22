@@ -28,6 +28,7 @@ class JobService:
         depends_on: list[UUID],
         max_runtime: int | None,
         max_memory: int | None,
+        env_vars: dict[str, str] | None = None,
     ) -> Job:
         """Validate and persist a new job.
 
@@ -60,6 +61,7 @@ class JobService:
             depends_on=depends_on,
             max_runtime=max_runtime,
             max_memory=max_memory,
+            env_vars=env_vars or {},
             status=JobStatus.PENDING,
             created_at=now,
             updated_at=now,

@@ -44,7 +44,7 @@ class FakeProcessManager:
         self._exited: dict[int, int] = {}
         self.signals: list[tuple[int, signal.Signals]] = []
 
-    def start(self, command: str) -> int:
+    def start(self, command: str, env_vars=None, stdout_path=None, stderr_path=None) -> int:
         pid = self._next_pid
         self._next_pid += 1
         if self._default_exit_code is not None:

@@ -33,7 +33,12 @@ class ExecutionService:
         It is designed to be run as an asyncio task by the claim loop.
         """
         # Start the process
-        pid = self._pm.start(job.command)
+        pid = self._pm.start(
+            job.command,
+            env_vars=job.env_vars if job.env_vars else None,
+            stdout_path=job.stdout_path,
+            stderr_path=job.stderr_path,
+        )
         job.pid = pid
         started_at = datetime.now(UTC)
 
@@ -62,13 +67,20 @@ class ExecutionService:
         started_at: datetime,
     ) -> None:
         """Poll loop: check exit, enforce limits, detect cancel/lost."""
+        peak_memory_mb: float = 0.0
+
         while True:
             await asyncio.sleep(JOB_STATUS_POLL_INTERVAL_SECONDS)
+
+            # Track peak memory
+            rss = self._pm.get_rss_mb(pid)
+            if rss > peak_memory_mb:
+                peak_memory_mb = rss
 
             # Check if process exited naturally
             exit_code = self._pm.poll_exit(pid)
             if exit_code is not None:
-                await self._record_natural_exit(job, exit_code)
+                await self._record_natural_exit(job, exit_code, peak_memory_mb)
                 return
 
             # Check current DB status for cancellation or lost
@@ -87,29 +99,34 @@ class ExecutionService:
                 elapsed = (datetime.now(UTC) - started_at).total_seconds()
                 if elapsed >= job.max_runtime:
                     logger.info("Job %s exceeded max_runtime=%ds — terminating", job.job_id, job.max_runtime)
-                    await self._kill_for_limit(job, pid, "max_runtime_exceeded")
+                    await self._kill_for_limit(job, pid, "max_runtime_exceeded", peak_memory_mb)
                     return
 
             # Enforce max_memory
             if job.max_memory is not None:
-                rss_mb = self._pm.get_rss_mb(pid)
-                if rss_mb > job.max_memory:
+                if rss > job.max_memory:
                     logger.info(
                         "Job %s exceeded max_memory=%dMB (actual=%.1fMB) — terminating",
                         job.job_id,
                         job.max_memory,
-                        rss_mb,
+                        rss,
                     )
-                    await self._kill_for_limit(job, pid, "max_memory_exceeded")
+                    await self._kill_for_limit(job, pid, "max_memory_exceeded", peak_memory_mb)
                     return
 
-    async def _record_natural_exit(self, job: JobExecution, exit_code: int) -> None:
+    async def _record_natural_exit(
+        self,
+        job: JobExecution,
+        exit_code: int,
+        peak_memory_mb: float,
+    ) -> None:
         finished_at = datetime.now(UTC)
         status = "completed" if exit_code == 0 else "failed"
         await self._db.update_status(
             job.job_id,
             status,
             exit_code=exit_code,
+            peak_memory_mb=peak_memory_mb,
             finished_at=finished_at,
         )
         logger.info("Job %s exited with code %d → %s", job.job_id, exit_code, status)
@@ -119,6 +136,7 @@ class ExecutionService:
         job: JobExecution,
         pid: int,
         kill_reason: str,
+        peak_memory_mb: float,
     ) -> None:
         """SIGTERM → grace period → SIGKILL, then record as failed."""
         self._pm.kill_group(pid, signal.SIGTERM)
@@ -139,6 +157,7 @@ class ExecutionService:
             job.job_id,
             "failed",
             kill_reason=kill_reason,
+            peak_memory_mb=peak_memory_mb,
             finished_at=finished_at,
         )
         logger.info("Job %s killed — %s", job.job_id, kill_reason)

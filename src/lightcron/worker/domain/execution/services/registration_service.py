@@ -24,11 +24,16 @@ class RegistrationService:
             raise RuntimeError("Worker not registered yet")
         return self._worker_id
 
-    async def register(self) -> UUID:
+    async def register(self, base_url: str | None = None) -> UUID:
         """Upsert this worker into worker_status and return the worker_id."""
         hostname = socket.gethostname()
-        self._worker_id = await self._db.upsert_worker(hostname)
-        logger.info("Registered as worker_id=%s hostname=%s", self._worker_id, hostname)
+        self._worker_id = await self._db.upsert_worker(hostname, base_url=base_url)
+        logger.info(
+            "Registered as worker_id=%s hostname=%s base_url=%s",
+            self._worker_id,
+            hostname,
+            base_url,
+        )
         return self._worker_id
 
     async def run_heartbeat_loop(self) -> None:

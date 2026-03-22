@@ -33,3 +33,7 @@ WORKER_OFFLINE_THRESHOLD_SECONDS: int = 90
 # Process lifecycle
 SIGTERM_GRACE_PERIOD_SECONDS: int = 30
 """Seconds to wait after SIGTERM before sending SIGKILL."""
+
+# Worker output
+WORKER_DEFAULT_JOBS_DIR: str = "/var/logs/lightcron/jobs"
+"""Default directory on the worker node for job stdout/stderr output files."""

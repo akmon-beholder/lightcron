@@ -11,6 +11,7 @@ from lightcron.scheduler.domain.workers.entities import Worker, WorkerStatus
 
 _SELECT_COLS = """
     w.worker_id, w.hostname, w.status, w.last_seen, w.registered_at,
+    w.base_url,
     COUNT(j.job_id) FILTER (WHERE j.status = 'running') AS running_job_count
 """
 
@@ -28,6 +29,7 @@ def _row_to_worker(row: sa.engine.Row) -> Worker:  # type: ignore[type-arg]
         last_seen=row.last_seen,
         registered_at=row.registered_at,
         running_job_count=row.running_job_count or 0,
+        base_url=row.base_url,
     )
 
 
@@ -56,7 +58,7 @@ class PostgresWorkerRepository:
                         VALUES (:hostname, 'online', now(), now())
                         ON CONFLICT (hostname) DO UPDATE
                             SET status = 'online', last_seen = now()
-                        RETURNING worker_id, hostname, status, last_seen, registered_at
+                        RETURNING worker_id, hostname, status, last_seen, registered_at, base_url
                     """),
                 {"hostname": hostname},
             )
@@ -69,6 +71,7 @@ class PostgresWorkerRepository:
             last_seen=result.last_seen,
             registered_at=result.registered_at,
             running_job_count=0,
+            base_url=result.base_url,
         )
 
     async def mark_offline(self, worker_id: UUID) -> bool:

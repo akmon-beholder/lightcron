@@ -21,3 +21,4 @@ class Worker:
     last_seen: datetime
     registered_at: datetime
     running_job_count: int = 0
+    base_url: str | None = None

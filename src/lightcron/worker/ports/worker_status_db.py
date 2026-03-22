@@ -7,7 +7,7 @@ from uuid import UUID
 
 
 class WorkerStatusDB(Protocol):
-    async def upsert_worker(self, hostname: str) -> UUID:
+    async def upsert_worker(self, hostname: str, base_url: str | None = None) -> UUID:
         """Insert or update a worker_status row. Returns the worker_id."""
         ...
 

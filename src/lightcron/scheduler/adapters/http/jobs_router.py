@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from lightcron.scheduler.adapters.http.deps import get_job_service
 from lightcron.scheduler.adapters.http.schemas import (
     CancelJobResponse,
-    JobResponse,
+    JobDetailResponse,
+    JobSummaryResponse,
     ScheduleJobRequest,
 )
 from lightcron.scheduler.domain.jobs.entities import JobStatus
@@ -18,15 +19,11 @@ from lightcron.scheduler.domain.jobs.services.job_service import JobService
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
-def _job_to_response(job: object) -> JobResponse:
-    return JobResponse.model_validate(job)
-
-
-@router.post("", status_code=201, response_model=JobResponse)
+@router.post("", status_code=201, response_model=JobSummaryResponse)
 async def schedule_job(
     body: ScheduleJobRequest,
     service: JobService = Depends(get_job_service),
-) -> JobResponse:
+) -> JobSummaryResponse:
     try:
         job = await service.schedule_job(
             command=body.command,
@@ -34,28 +31,29 @@ async def schedule_job(
             depends_on=body.depends_on,
             max_runtime=body.max_runtime,
             max_memory=body.max_memory,
+            env_vars=body.env_vars,
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return _job_to_response(job)
+    return JobSummaryResponse.model_validate(job)
 
 
-@router.get("/{job_id}", response_model=JobResponse)
+@router.get("/{job_id}", response_model=JobDetailResponse)
 async def get_job(
     job_id: UUID,
     service: JobService = Depends(get_job_service),
-) -> JobResponse:
+) -> JobDetailResponse:
     job = await service.get_job(job_id)
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
-    return _job_to_response(job)
+    return JobDetailResponse.model_validate(job)
 
 
-@router.get("", response_model=list[JobResponse])
+@router.get("", response_model=list[JobSummaryResponse])
 async def list_jobs(
     status: str | None = Query(default=None),
     service: JobService = Depends(get_job_service),
-) -> list[JobResponse]:
+) -> list[JobSummaryResponse]:
     parsed_status: JobStatus | None = None
     if status is not None:
         try:
@@ -66,7 +64,7 @@ async def list_jobs(
                 detail=[{"field": "status", "msg": f"'{status}' is not a valid job status"}],
             ) from None
     jobs = await service.list_jobs(parsed_status)
-    return [_job_to_response(j) for j in jobs]
+    return [JobSummaryResponse.model_validate(j) for j in jobs]
 
 
 @router.post("/{job_id}/cancel", response_model=CancelJobResponse)

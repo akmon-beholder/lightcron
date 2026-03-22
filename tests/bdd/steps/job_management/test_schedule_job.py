@@ -43,6 +43,20 @@ def test_reject_invalid_max_runtime() -> None: ...
 def test_reject_malformed_json() -> None: ...
 
 
+# ── v2 env_vars scenarios ──────────────────────────────────────────────────────
+
+@scenario(FEATURE, "Successfully schedule a job with env_vars")
+def test_schedule_with_env_vars() -> None: ...
+
+
+@scenario(FEATURE, "Job submitted without env_vars has an empty env_vars map")
+def test_schedule_no_env_vars_defaults_empty() -> None: ...
+
+
+@scenario(FEATURE, "Reject a job with env_vars containing non-string values")
+def test_reject_env_vars_non_string() -> None: ...
+
+
 # ── Givens ────────────────────────────────────────────────────────────────────
 
 @given(parsers.parse('a job "{name}" already exists'))
@@ -82,6 +96,8 @@ def submit_job_with_table(
     if "depends_on" in rows:
         dep_names = json.loads(rows["depends_on"])
         payload["depends_on"] = [str(ctx.job_ids[n]) for n in dep_names]
+    if "env_vars" in rows:
+        payload["env_vars"] = json.loads(rows["env_vars"])
 
     resp = http_client.post("/jobs", json=payload)
     ctx.response = resp
@@ -184,3 +200,32 @@ def assert_missing_field(field: str, ctx: SimpleNamespace) -> None:
 def assert_unknown_dep_error(ctx: SimpleNamespace) -> None:
     body = ctx.response.text
     assert "depends_on" in body or "unknown" in body.lower(), f"Unexpected: {body}"
+
+
+# ── v2 env_vars when/then ─────────────────────────────────────────────────────
+
+@when("a job_submitter submits a POST /jobs request with env_vars containing a non-string value")
+def submit_job_non_string_env_vars(ctx: SimpleNamespace, http_client: TestClient) -> None:
+    future = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
+    # Send raw JSON with integer value — bypasses Pydantic coercion
+    ctx.response = http_client.post(
+        "/jobs",
+        content=json.dumps({"command": "echo test", "start_time": future, "env_vars": {"KEY": 123}}),
+        headers={"Content-Type": "application/json"},
+    )
+
+
+@then(parsers.parse('the job env_vars contains key "{key}" with value "{value}"'))
+def assert_env_var_key_value(key: str, value: str, ctx: SimpleNamespace) -> None:
+    data = ctx.response.json()
+    assert "env_vars" in data, f"env_vars missing from response: {data}"
+    assert data["env_vars"].get(key) == value, (
+        f"env_vars[{key!r}] = {data['env_vars'].get(key)!r}, expected {value!r}"
+    )
+
+
+@then("the job env_vars is empty")
+def assert_env_vars_empty(ctx: SimpleNamespace) -> None:
+    data = ctx.response.json()
+    assert "env_vars" in data, f"env_vars missing from response: {data}"
+    assert data["env_vars"] == {}, f"Expected empty env_vars, got: {data['env_vars']}"

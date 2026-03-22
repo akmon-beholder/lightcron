@@ -17,7 +17,7 @@ class FakeWorkerStatusDB:
         self._worker_id = worker_id or uuid4()
         self.last_seen_updates: list[UUID] = []
 
-    async def upsert_worker(self, hostname: str) -> UUID:
+    async def upsert_worker(self, hostname: str, base_url: str | None = None) -> UUID:
         return self._worker_id
 
     async def update_last_seen(self, worker_id: UUID) -> None:

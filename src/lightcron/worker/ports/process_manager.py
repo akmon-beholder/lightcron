@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 import signal
+from pathlib import Path
 from typing import Protocol
 
 
 class ProcessManager(Protocol):
-    def start(self, command: str) -> int:
+    def start(
+        self,
+        command: str,
+        env_vars: dict[str, str] | None = None,
+        stdout_path: Path | None = None,
+        stderr_path: Path | None = None,
+    ) -> int:
         """Spawn a subprocess for command. Returns the PID."""
         ...
 
